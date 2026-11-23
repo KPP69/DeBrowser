@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Code", Consolas, "SF Mono", monospace;
+}
+
+/*
+ * Design tokens — the single source of UI color for the whole
+ * application (pages, dialogs, menus, inputs, states). Components
+ * never hard-code hex values; they reference these variables.
+ * The active theme is chosen by the data-theme attribute on
+ * <html> (light | warm | dark) and is persisted by the backend in
+ * config/settings.json. First launch (no saved choice, and the
+ * pre-load fallback below) is the LIGHT theme.
+ *
+ * Palette basis (product visual specification, 2026-11-15):
+ *   light — neutral light greys and white, blue accent;
+ *   warm  — low-saturation warm whites and beige, brown accent;
+ *   dark  — dark greys (never pure black), soft light text.
+ */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f5f6f8;
+  --sidebar-bg: #f0f2f5;
+  --topbar-bg: #ffffff;
+  --panel-bg: #ffffff;
+  --input-bg: #ffffff;
+  --border: #e2e5ea;
+  --border-strong: #cbd2dc;
+  --text-main: #20242c;
+  --text-dim: #596273;
+  --text-faint: #7c8492;
+  --text-disabled: #a6adb9;
+  --accent: #4269a8;
+  --accent-contrast: #ffffff;
+  --accent-soft: #e4ebf5;
+  --hover-bg: #e9edf3;
+  --ok: #27845a;
+  --warn: #b7791f;
+  --warn-bg: #faf0dc;
+  --danger: #c44747;
+  --danger-contrast: #ffffff;
+  --danger-bg: #f9e8e8;
+  --danger-border: #e5b5b5;
+  --scrollbar: #c9ceda;
+}
+
+:root[data-theme="warm"] {
+  color-scheme: light;
+  --app-bg: #f5f1e9;
+  --sidebar-bg: #eee8de;
+  --topbar-bg: #fbf8f2;
+  --panel-bg: #fbf8f2;
+  --input-bg: #fffdf8;
+  --border: #e2dace;
+  --border-strong: #cfc2ab;
+  --text-main: #302d28;
+  --text-dim: #625b50;
+  --text-faint: #887f72;
+  --text-disabled: #a79c8d;
+  --accent: #94734c;
+  --accent-contrast: #ffffff;
+  --accent-soft: #ede4d3;
+  --hover-bg: #eae2d5;
+  --ok: #548064;
+  --warn: #a97835;
+  --warn-bg: #f3e8d2;
+  --danger: #b65f55;
+  --danger-contrast: #ffffff;
+  --danger-bg: #f6e3de;
+  --danger-border: #dca79c;
+  --scrollbar: #cdbfa6;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #171a20;
+  --sidebar-bg: #1b1f27;
+  --topbar-bg: #20252e;
+  --panel-bg: #20252e;
+  --input-bg: #191e26;
+  --border: #343b47;
+  --border-strong: #454f5e;
+  --text-main: #e7eaf0;
+  --text-dim: #b0b8c5;
+  --text-faint: #8791a0;
+  --text-disabled: #5d6774;
+  --accent: #83a9e6;
+  --accent-contrast: #10141b;
+  --accent-soft: #26334d;
+  --hover-bg: #2a313d;
+  --ok: #63bd8b;
+  --warn: #e0ad58;
+  --warn-bg: #38301e;
+  --danger: #e27b7b;
+  --danger-contrast: #2a1214;
+  --danger-bg: #3a2426;
+  --danger-border: #6e3a3c;
+  --scrollbar: #39424f;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--app-bg);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* Slim scrollbars that follow the active theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar);
+  border-radius: 4px;
+}
+
+/* 全局通知动画：浮动提示淡入、通知台从右侧滑入。 */
+@keyframes notification-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes notification-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.notification-toast {
+  animation: notification-in 0.18s ease-out;
+}
+
+.notification-drawer {
+  animation: notification-drawer-in 0.2s ease-out;
+}

@@ -1,0 +1,185 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/onbeee/DeBrowser/internal/model"
+)
+
+const instanceColumns = `id, name, kernel_id, kernel_name, kernel_version, user_data_dir, proxy_id, proxy_listen_port, status, start_url, sort_order, created_at, updated_at`
+
+func scanInstance(row interface{ Scan(dest ...any) error }) (model.Instance, error) {
+	var (
+		in         model.Instance
+		proxyID    sql.NullString
+		listenPort sql.NullInt64
+		status     string
+	)
+	if err := row.Scan(&in.ID, &in.Name, &in.KernelID, &in.KernelName,
+		&in.KernelVersion, &in.UserDataDir, &proxyID, &listenPort, &status,
+		&in.StartURL, &in.SortOrder, &in.CreatedAt, &in.UpdatedAt); err != nil {
+		return model.Instance{}, err
+	}
+	if proxyID.Valid {
+		in.ProxyID = &proxyID.String
+	}
+	if listenPort.Valid {
+		v := int(listenPort.Int64)
+		in.ProxyListenPort = &v
+	}
+	in.Status = model.InstanceStatus(status)
+	return in, nil
+}
+
+// CreateInstance inserts a new browser instance, generating its ID
+// when empty. Status defaults to stopped.
+func (s *Store) CreateInstance(ctx context.Context, in model.Instance) (model.Instance, error) {
+	if in.ID == "" {
+		id, err := newID()
+		if err != nil {
+			return model.Instance{}, err
+		}
+		in.ID = id
+	}
+	if in.Status == "" {
+		in.Status = model.StatusStopped
+	}
+	if _, err := s.q.ExecContext(ctx, `INSERT INTO browser_instances
+		(id, name, kernel_id, kernel_name, kernel_version, user_data_dir,
+		 proxy_id, proxy_listen_port, status, start_url, sort_order)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.ID, in.Name, in.KernelID, in.KernelName, in.KernelVersion,
+		in.UserDataDir, nullStr(in.ProxyID), nullInt(in.ProxyListenPort), string(in.Status),
+		in.StartURL, in.SortOrder); err != nil {
+		return model.Instance{}, fmt.Errorf("store: create instance: %w", err)
+	}
+	return s.GetInstance(ctx, in.ID)
+}
+
+// GetInstance returns one instance by ID, or ErrNotFound.
+func (s *Store) GetInstance(ctx context.Context, id string) (model.Instance, error) {
+	in, err := scanInstance(s.q.QueryRowContext(ctx,
+		`SELECT `+instanceColumns+` FROM browser_instances WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.Instance{}, ErrNotFound
+	}
+	if err != nil {
+		return model.Instance{}, fmt.Errorf("store: get instance: %w", err)
+	}
+	return in, nil
+}
+
+// ListInstances returns all instances in display order.
+func (s *Store) ListInstances(ctx context.Context) ([]model.Instance, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT `+instanceColumns+` FROM browser_instances ORDER BY sort_order, name, id`)
+	if err != nil {
+		return nil, fmt.Errorf("store: list instances: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []model.Instance
+	for rows.Next() {
+		in, err := scanInstance(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: list instances: %w", err)
+		}
+		out = append(out, in)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list instances: %w", err)
+	}
+	return out, nil
+}
+
+// UpdateInstance replaces the editable fields of an instance and
+// refreshes its updated_at timestamp.
+func (s *Store) UpdateInstance(ctx context.Context, in model.Instance) (model.Instance, error) {
+	res, err := s.q.ExecContext(ctx, `UPDATE browser_instances SET
+		name = ?, kernel_id = ?, kernel_name = ?, kernel_version = ?,
+		user_data_dir = ?, proxy_id = ?, proxy_listen_port = ?, status = ?, start_url = ?,
+		sort_order = ?, updated_at = datetime('now')
+		WHERE id = ?`,
+		in.Name, in.KernelID, in.KernelName, in.KernelVersion,
+		in.UserDataDir, nullStr(in.ProxyID), nullInt(in.ProxyListenPort), string(in.Status),
+		in.StartURL, in.SortOrder, in.ID)
+	if err != nil {
+		return model.Instance{}, fmt.Errorf("store: update instance: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return model.Instance{}, fmt.Errorf("store: update instance: %w", err)
+	} else if n == 0 {
+		return model.Instance{}, ErrNotFound
+	}
+	return s.GetInstance(ctx, in.ID)
+}
+
+// SetInstanceStatus persists a lifecycle state transition.
+func (s *Store) SetInstanceStatus(ctx context.Context, id string, status model.InstanceStatus) error {
+	res, err := s.q.ExecContext(ctx, `UPDATE browser_instances SET
+		status = ?, updated_at = datetime('now') WHERE id = ?`,
+		string(status), id)
+	if err != nil {
+		return fmt.Errorf("store: set instance status: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("store: set instance status: %w", err)
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ReconcileInstanceStatuses resets every instance persisted as
+// "running" WITHOUT a Stage 9B runtime record back to "stopped"
+// and returns how many rows changed. Such a row can only be a
+// leftover from before process tracking existed (or from a launch
+// that died before its record was written): no live process can
+// be re-identified for it, so "stopped" is the only safe state.
+// Instances WITH a runtime record are reconciled separately by
+// verifying the recorded process (see InstanceService startup
+// reconciliation) and are deliberately not touched here.
+func (s *Store) ReconcileInstanceStatuses(ctx context.Context) (int64, error) {
+	res, err := s.q.ExecContext(ctx, `UPDATE browser_instances SET
+		status = 'stopped', updated_at = datetime('now')
+		WHERE status = 'running'
+		  AND id NOT IN (SELECT instance_id FROM instance_runtime)`)
+	if err != nil {
+		return 0, fmt.Errorf("store: reconcile instance statuses: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("store: reconcile instance statuses: %w", err)
+	}
+	return n, nil
+}
+
+// DeleteInstance removes an instance. Its bookmarks are deleted with
+// it (schema ON DELETE CASCADE); the profile directory on disk is the
+// caller's concern (Stage 3) and is not touched here.
+func (s *Store) DeleteInstance(ctx context.Context, id string) error {
+	res, err := s.q.ExecContext(ctx, `DELETE FROM browser_instances WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("store: delete instance: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("store: delete instance: %w", err)
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountInstancesByKernelID reports how many instances reference the
+// given registered-browser ID in their kernel_id column. It guards
+// registration removal: a referenced registration must not disappear
+// from under its instances.
+func (s *Store) CountInstancesByKernelID(ctx context.Context, kernelID string) (int, error) {
+	var n int
+	if err := s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM browser_instances WHERE kernel_id = ?`, kernelID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: count instances by kernel: %w", err)
+	}
+	return n, nil
+}
