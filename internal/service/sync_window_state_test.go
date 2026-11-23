@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/winmgr"
+	"github.com/KPP69/DeBrowser/internal/winmgr"
 )
 
 // Regression tests for the Stage 10 window-state fixes:

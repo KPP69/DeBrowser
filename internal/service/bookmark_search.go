@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/chromebookmarks"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/chromebookmarks"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // Aggregated cross-instance search (Stage 9C sync edit/delete).

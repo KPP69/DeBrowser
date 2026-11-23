@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/capture"
-	"github.com/onbeee/DeBrowser/internal/cdp"
+	"github.com/KPP69/DeBrowser/internal/capture"
+	"github.com/KPP69/DeBrowser/internal/cdp"
 )
 
 // pageTracker attaches to the page targets of ONE browser

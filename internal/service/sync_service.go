@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/cdp"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/winmgr"
+	"github.com/KPP69/DeBrowser/internal/cdp"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/winmgr"
 )
 
 // SyncService is the Stage 10 multi-instance synchronization

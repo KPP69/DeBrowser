@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
-import type { NodeView } from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+import type { NodeView } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 
 // 代理节点选择器：代理配置页与浏览器实例页共用的同一个
 // 组件。菜单顶部是固定搜索框（按节点名不区分大小写部分

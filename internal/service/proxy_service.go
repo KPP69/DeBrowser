@@ -38,13 +38,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/mihomo"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/paths"
-	"github.com/onbeee/DeBrowser/internal/secrets"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/mihomo"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/secrets"
+	"github.com/KPP69/DeBrowser/internal/store"
 
 	"gopkg.in/yaml.v3"
 )

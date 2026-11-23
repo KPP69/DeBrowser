@@ -47,7 +47,7 @@ import * as $models from "./models.js";
  * registration instead of duplicating it.
  */
 export function AddBrowserManually(operationID: string): $CancellablePromise<$models.BrowserView> {
-    return $Call.ByID(4106159291, operationID);
+    return $Call.ByID(1109893093, operationID);
 }
 
 /**
@@ -56,7 +56,7 @@ export function AddBrowserManually(operationID: string): $CancellablePromise<$mo
  * re-verify).
  */
 export function GetBrowserDetails(id: string): $CancellablePromise<$models.BrowserView> {
-    return $Call.ByID(1520246943, id);
+    return $Call.ByID(3391302089, id);
 }
 
 /**
@@ -65,7 +65,7 @@ export function GetBrowserDetails(id: string): $CancellablePromise<$models.Brows
  * user registrations.
  */
 export function ListBrowsers(): $CancellablePromise<$models.BrowserView[] | null> {
-    return $Call.ByID(4039855654);
+    return $Call.ByID(4098277220);
 }
 
 /**
@@ -74,7 +74,7 @@ export function ListBrowsers(): $CancellablePromise<$models.BrowserView[] | null
  * file itself is never deleted, moved or modified.
  */
 export function RemoveBrowserRegistration(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(2057492488, operationID, id);
+    return $Call.ByID(1558303854, operationID, id);
 }
 
 /**
@@ -85,5 +85,5 @@ export function RemoveBrowserRegistration(operationID: string, id: string): $Can
  * holds.
  */
 export function UpdateBrowserPath(operationID: string, id: string): $CancellablePromise<$models.BrowserView> {
-    return $Call.ByID(3881955469, operationID, id);
+    return $Call.ByID(2592547159, operationID, id);
 }

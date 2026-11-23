@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Events } from "@wailsio/runtime";
-import { AppService } from "../bindings/github.com/onbeee/DeBrowser/internal/service";
+import { AppService } from "../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { AppStatus } from "../bindings/events";
 import Sidebar from "./components/layout/Sidebar";
 import TopBar from "./components/layout/TopBar";

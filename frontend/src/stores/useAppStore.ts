@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Status } from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+import type { Status } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 
 export type PageKey =
   | "instances"

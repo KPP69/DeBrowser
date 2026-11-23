@@ -1,4 +1,4 @@
-import { AppService } from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+import { AppService } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { useAppStore, type Theme } from "../stores/useAppStore";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";

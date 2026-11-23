@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/secrets"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/secrets"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 const testSubURL = "https://example.com/sub?token=TESTONLY"

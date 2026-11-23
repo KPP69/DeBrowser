@@ -3,7 +3,7 @@ import { AppWindow, FolderOpen, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   BrowserService,
   type BrowserView,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { notifyError, notifySuccess, notifyWarning } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 

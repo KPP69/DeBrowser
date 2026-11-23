@@ -3,9 +3,9 @@ package service
 import (
 	"errors"
 
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/secrets"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/secrets"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // Operation recording (unified recording system): every

@@ -33,7 +33,7 @@ import * as $models from "./models.js";
  * profile files change; the library is never touched.
  */
 export function ApplySearchDelete(operationID: string, token: string, groupKeys: string[] | null): $CancellablePromise<$models.ApplySearchResult> {
-    return $Call.ByID(2416284014, operationID, token, groupKeys);
+    return $Call.ByID(2099265232, operationID, token, groupKeys);
 }
 
 /**
@@ -42,14 +42,14 @@ export function ApplySearchDelete(operationID: string, token: string, groupKeys:
  * is never touched.
  */
 export function ApplySearchEdit(operationID: string, token: string, groupKeys: string[] | null, newName: string, newURL: string): $CancellablePromise<$models.ApplySearchResult> {
-    return $Call.ByID(3985106189, operationID, token, groupKeys, newName, newURL);
+    return $Call.ByID(2457382095, operationID, token, groupKeys, newName, newURL);
 }
 
 /**
  * CreateLibraryNode adds a bookmark or folder to the library.
  */
 export function CreateLibraryNode(operationID: string, input: $models.CreateLibraryNodeInput): $CancellablePromise<model$0.BookmarkNode> {
-    return $Call.ByID(1485028770, operationID, input);
+    return $Call.ByID(2650485956, operationID, input);
 }
 
 /**
@@ -58,7 +58,7 @@ export function CreateLibraryNode(operationID: string, input: $models.CreateLibr
  * the exact scope with the user first.
  */
 export function DeleteLibraryNodes(operationID: string, ids: string[] | null): $CancellablePromise<number> {
-    return $Call.ByID(1465551448, operationID, ids);
+    return $Call.ByID(1792678178, operationID, ids);
 }
 
 /**
@@ -67,7 +67,7 @@ export function DeleteLibraryNodes(operationID: string, ids: string[] | null): $
  * stopped; anything else reports -1 (shown as unknown).
  */
 export function ListBookmarkInstances(): $CancellablePromise<$models.BookmarkInstanceInfo[] | null> {
-    return $Call.ByID(2649950997);
+    return $Call.ByID(1805297771);
 }
 
 /**
@@ -75,7 +75,7 @@ export function ListBookmarkInstances(): $CancellablePromise<$models.BookmarkIns
  * frontend assembles the tree from the parent pointers.
  */
 export function ListLibrary(): $CancellablePromise<model$0.BookmarkNode[] | null> {
-    return $Call.ByID(2013800494);
+    return $Call.ByID(2114615164);
 }
 
 /**
@@ -83,7 +83,7 @@ export function ListLibrary(): $CancellablePromise<model$0.BookmarkNode[] | null
  * level (the root when parentID is nil).
  */
 export function ReorderLibrary(operationID: string, parentID: string | null, orderedIDs: string[] | null): $CancellablePromise<void> {
-    return $Call.ByID(2358555517, operationID, parentID, orderedIDs);
+    return $Call.ByID(4141969075, operationID, parentID, orderedIDs);
 }
 
 /**
@@ -91,7 +91,7 @@ export function ReorderLibrary(operationID: string, parentID: string | null, ord
  * across all readable, confirmed-stopped instances.
  */
 export function SearchInstanceBookmarks(operationID: string, query: string, kind: string): $CancellablePromise<$models.BookmarkSearchResult> {
-    return $Call.ByID(3559473153, operationID, query, kind);
+    return $Call.ByID(4110893655, operationID, query, kind);
 }
 
 /**
@@ -103,12 +103,12 @@ export function SearchInstanceBookmarks(operationID: string, query: string, kind
  * and same-name folders are reused rather than duplicated.
  */
 export function SyncBookmarks(operationID: string, nodeIDs: string[] | null, instanceIDs: string[] | null): $CancellablePromise<$models.SyncBookmarksResult> {
-    return $Call.ByID(3415866813, operationID, nodeIDs, instanceIDs);
+    return $Call.ByID(2247275675, operationID, nodeIDs, instanceIDs);
 }
 
 /**
  * UpdateLibraryNode renames, retargets or moves a library node.
  */
 export function UpdateLibraryNode(operationID: string, input: $models.UpdateLibraryNodeInput): $CancellablePromise<model$0.BookmarkNode> {
-    return $Call.ByID(3736846269, operationID, input);
+    return $Call.ByID(826081263, operationID, input);
 }

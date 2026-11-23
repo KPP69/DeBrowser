@@ -24,7 +24,7 @@ import * as $models from "./models.js";
  * when none was configured.
  */
 export function EffectiveLogCapacityBytes(): $CancellablePromise<number> {
-    return $Call.ByID(622933680);
+    return $Call.ByID(1663084482);
 }
 
 /**
@@ -32,7 +32,7 @@ export function EffectiveLogCapacityBytes(): $CancellablePromise<number> {
  * always Simplified Chinese (zh-CN); the theme is user-selectable.
  */
 export function GetSettings(): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(633190389);
+    return $Call.ByID(3087195619);
 }
 
 /**
@@ -41,7 +41,7 @@ export function GetSettings(): $CancellablePromise<settings$0.Settings> {
  * contains no business data.
  */
 export function GetStatus(): $CancellablePromise<$models.Status> {
-    return $Call.ByID(528367370);
+    return $Call.ByID(1913897432);
 }
 
 /**
@@ -49,7 +49,7 @@ export function GetStatus(): $CancellablePromise<$models.Status> {
  * settings (config/settings.json), so it survives restarts.
  */
 export function SaveLogCapacity(bytes: number): $CancellablePromise<void> {
-    return $Call.ByID(1434213961, bytes);
+    return $Call.ByID(3056713907, bytes);
 }
 
 /**
@@ -60,5 +60,5 @@ export function SaveLogCapacity(bytes: number): $CancellablePromise<void> {
  * unified recording system under the caller-provided operation ID.
  */
 export function SaveTheme(operationID: string, theme: string): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(577347262, operationID, theme);
+    return $Call.ByID(3806798152, operationID, theme);
 }

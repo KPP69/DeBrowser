@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // Instance files (user-facing name for profile directories) live

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 const instanceColumns = `id, name, kernel_id, kernel_name, kernel_version, user_data_dir, proxy_id, proxy_listen_port, status, start_url, sort_order, created_at, updated_at`

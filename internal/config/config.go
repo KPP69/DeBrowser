@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onbeee/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/paths"
 )
 
 // EnvAppRoot overrides the executable directory (development/tests).

@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/config"
 )
 
 // Category identifies one of the three log streams.

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/winmgr"
+	"github.com/KPP69/DeBrowser/internal/winmgr"
 )
 
 func bareSession() *syncSession {

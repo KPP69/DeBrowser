@@ -8,8 +8,8 @@ import {
   type NodeTestResultView,
   type NodeView,
   type SourceView,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
-import type { Instance } from "../../bindings/github.com/onbeee/DeBrowser/internal/model";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
+import type { Instance } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import ProxyNodePicker from "../components/ProxyNodePicker";

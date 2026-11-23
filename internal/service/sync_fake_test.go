@@ -15,7 +15,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/onbeee/DeBrowser/internal/cdp"
+	"github.com/KPP69/DeBrowser/internal/cdp"
 )
 
 // fakeBrowserCDP is an in-process CDP-shaped server for sync

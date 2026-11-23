@@ -36,14 +36,14 @@ import * as $models from "./models.js";
  * as primary records of the chosen category.
  */
 export function ExportRecords(operationID: string, category: string, startDate: string, endDate: string): $CancellablePromise<$models.ExportResult> {
-    return $Call.ByID(1127778917, operationID, category, startDate, endDate);
+    return $Call.ByID(4008415755, operationID, category, startDate, endDate);
 }
 
 /**
  * GetDiagnostics returns the current diagnostics snapshot.
  */
 export function GetDiagnostics(): $CancellablePromise<$models.DiagnosticsView> {
-    return $Call.ByID(3751611563);
+    return $Call.ByID(365364421);
 }
 
 /**
@@ -53,7 +53,7 @@ export function GetDiagnostics(): $CancellablePromise<$models.DiagnosticsView> {
  * from the retained records on every call — never fixed.
  */
 export function GetLogExportInfo(category: string): $CancellablePromise<$models.LogExportInfo> {
-    return $Call.ByID(3255741495, category);
+    return $Call.ByID(1106595613, category);
 }
 
 /**
@@ -62,7 +62,7 @@ export function GetLogExportInfo(category: string): $CancellablePromise<$models.
  * business failures (an invalid category is the only error).
  */
 export function RecordClientEvent(input: $models.ClientEventInput): $CancellablePromise<void> {
-    return $Call.ByID(3499212527, input);
+    return $Call.ByID(1232470785, input);
 }
 
 /**
@@ -74,5 +74,5 @@ export function RecordClientEvent(input: $models.ClientEventInput): $Cancellable
  * operation never pretends to have succeeded.
  */
 export function SetLogCapacity(operationID: string, bytes: number): $CancellablePromise<$models.LogCapacityView> {
-    return $Call.ByID(2942773117, operationID, bytes);
+    return $Call.ByID(4095563391, operationID, bytes);
 }

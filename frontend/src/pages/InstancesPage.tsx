@@ -17,8 +17,8 @@ import {
   type BindingView,
   type BrowserView,
   type NodeView,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
-import type { Instance, ProfileDirInfo } from "../../bindings/github.com/onbeee/DeBrowser/internal/model";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
+import type { Instance, ProfileDirInfo } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { useAppStore } from "../stores/useAppStore";
 import { notify, notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { classifyCounts } from "../lib/operationResult";

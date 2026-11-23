@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/paths"
 )
 
 func testSystem(t *testing.T) (*System, paths.Layout) {

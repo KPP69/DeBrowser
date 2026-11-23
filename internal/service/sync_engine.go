@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/cdp"
+	"github.com/KPP69/DeBrowser/internal/cdp"
 )
 
 // wireMaster installs the master connection's session-level

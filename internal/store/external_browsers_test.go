@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // Manual browser registrations are pure path records: any name

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/cdp"
+	"github.com/KPP69/DeBrowser/internal/cdp"
 )
 
 // syncQueue is one follower's bounded event queue with tail

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/chromebookmarks"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/chromebookmarks"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // bookmarkFixture is a small but real-structured Chromium

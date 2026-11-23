@@ -22,7 +22,7 @@ import * as $models from "./models.js";
  * of the file; the original is never modified.
  */
 export function AddFileSource(operationID: string, name: string): $CancellablePromise<$models.SourceView> {
-    return $Call.ByID(795440173, operationID, name);
+    return $Call.ByID(4140432451, operationID, name);
 }
 
 /**
@@ -32,7 +32,7 @@ export function AddFileSource(operationID: string, name: string): $CancellablePr
  * in the credential vault.
  */
 export function AddSubscriptionSource(operationID: string, name: string, rawURL: string): $CancellablePromise<$models.SourceView> {
-    return $Call.ByID(4160959462, operationID, name, rawURL);
+    return $Call.ByID(2544298460, operationID, name, rawURL);
 }
 
 /**
@@ -41,7 +41,7 @@ export function AddSubscriptionSource(operationID: string, name: string, rawURL:
  * is a no-op.
  */
 export function ClearBinding(operationID: string, instanceID: string): $CancellablePromise<void> {
-    return $Call.ByID(3553361645, operationID, instanceID);
+    return $Call.ByID(3016953835, operationID, instanceID);
 }
 
 /**
@@ -51,7 +51,7 @@ export function ClearBinding(operationID: string, instanceID: string): $Cancella
  * reported as a failed deletion — the deletion has committed.
  */
 export function DeleteSource(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(3166649453, operationID, id);
+    return $Call.ByID(3218598107, operationID, id);
 }
 
 /**
@@ -60,25 +60,25 @@ export function DeleteSource(operationID: string, id: string): $CancellablePromi
  * never as "running".
  */
 export function GetCoreStatus(): $CancellablePromise<$models.CoreStatusView> {
-    return $Call.ByID(2607189824);
+    return $Call.ByID(362664474);
 }
 
 export function ListBindings(): $CancellablePromise<$models.BindingView[] | null> {
-    return $Call.ByID(1519141597);
+    return $Call.ByID(42450507);
 }
 
 /**
  * ListNodes returns every imported node across all sources.
  */
 export function ListNodes(): $CancellablePromise<$models.NodeView[] | null> {
-    return $Call.ByID(1741012016);
+    return $Call.ByID(1554052754);
 }
 
 /**
  * ListSources returns all imported sources with node counts.
  */
 export function ListSources(): $CancellablePromise<$models.SourceView[] | null> {
-    return $Call.ByID(3151419215);
+    return $Call.ByID(2630003097);
 }
 
 /**
@@ -90,7 +90,7 @@ export function ListSources(): $CancellablePromise<$models.SourceView[] | null> 
  * instance never silently falls back to direct.
  */
 export function ProxyPortForInstance(instanceID: string): $CancellablePromise<number> {
-    return $Call.ByID(2136329050, instanceID);
+    return $Call.ByID(2207463580, instanceID);
 }
 
 /**
@@ -101,7 +101,7 @@ export function ProxyPortForInstance(instanceID: string): $CancellablePromise<nu
  * 未设置.
  */
 export function RefreshSource(operationID: string, id: string): $CancellablePromise<$models.SourceView> {
-    return $Call.ByID(367073987, operationID, id);
+    return $Call.ByID(1220340565, operationID, id);
 }
 
 /**
@@ -113,7 +113,7 @@ export function RefreshSource(operationID: string, id: string): $CancellableProm
  * file leaves the source exactly as it was.
  */
 export function ReimportFileSource(operationID: string, id: string): $CancellablePromise<$models.SourceView> {
-    return $Call.ByID(3052492324, operationID, id);
+    return $Call.ByID(1017327082, operationID, id);
 }
 
 /**
@@ -123,7 +123,7 @@ export function ReimportFileSource(operationID: string, id: string): $Cancellabl
  * write both pages use.
  */
 export function SetBinding(operationID: string, instanceID: string, nodeID: string): $CancellablePromise<$models.BindingView> {
-    return $Call.ByID(103901230, operationID, instanceID, nodeID);
+    return $Call.ByID(3388861640, operationID, instanceID, nodeID);
 }
 
 /**
@@ -131,14 +131,14 @@ export function SetBinding(operationID: string, instanceID: string, nodeID: stri
  * database state and starts the core.
  */
 export function StartCore(operationID: string): $CancellablePromise<$models.CoreStatusView> {
-    return $Call.ByID(208438706, operationID);
+    return $Call.ByID(1301607864, operationID);
 }
 
 /**
  * StopCore stops the managed core.
  */
 export function StopCore(operationID: string): $CancellablePromise<$models.CoreStatusView> {
-    return $Call.ByID(105252808, operationID);
+    return $Call.ByID(1661923802, operationID);
 }
 
 /**
@@ -153,5 +153,5 @@ export function StopCore(operationID: string): $CancellablePromise<$models.CoreS
  * to the caller for display only.
  */
 export function TestNodes(operationID: string, nodeIDs: string[] | null): $CancellablePromise<$models.NodeTestResultView[] | null> {
-    return $Call.ByID(3895242532, operationID, nodeIDs);
+    return $Call.ByID(2563959830, operationID, nodeIDs);
 }

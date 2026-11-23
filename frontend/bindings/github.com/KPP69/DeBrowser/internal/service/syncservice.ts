@@ -34,7 +34,7 @@ import * as $models from "./models.js";
  * keeps its original record.
  */
 export function ArrangeSyncWindows(operationID: string, instanceIDs: string[] | null, monitorID: number): $CancellablePromise<void> {
-    return $Call.ByID(3114702108, operationID, instanceIDs, monitorID);
+    return $Call.ByID(3619196690, operationID, instanceIDs, monitorID);
 }
 
 /**
@@ -42,21 +42,21 @@ export function ArrangeSyncWindows(operationID: string, instanceIDs: string[] | 
  * capability, straight from the instance runtime.
  */
 export function GetSyncCandidates(operationID: string): $CancellablePromise<$models.SyncCandidate[] | null> {
-    return $Call.ByID(523861317, operationID);
+    return $Call.ByID(2682537635, operationID);
 }
 
 /**
  * GetSyncState returns the current state for the UI.
  */
 export function GetSyncState(operationID: string): $CancellablePromise<$models.SyncStateView> {
-    return $Call.ByID(3000699012, operationID);
+    return $Call.ByID(2179054590, operationID);
 }
 
 /**
  * ListSyncMonitors enumerates the connected displays.
  */
 export function ListSyncMonitors(operationID: string): $CancellablePromise<$models.SyncMonitor[] | null> {
-    return $Call.ByID(2730054876, operationID);
+    return $Call.ByID(897972822, operationID);
 }
 
 /**
@@ -65,7 +65,7 @@ export function ListSyncMonitors(operationID: string): $CancellablePromise<$mode
  * Nothing is replayed later.
  */
 export function PauseSync(operationID: string): $CancellablePromise<$models.SyncStateView> {
-    return $Call.ByID(3907902309, operationID);
+    return $Call.ByID(739763575, operationID);
 }
 
 /**
@@ -75,7 +75,7 @@ export function PauseSync(operationID: string): $CancellablePromise<$models.Sync
  * it for a later retry and does not block the others.
  */
 export function RestoreSyncWindows(operationID: string): $CancellablePromise<void> {
-    return $Call.ByID(4141537658, operationID);
+    return $Call.ByID(3035584872, operationID);
 }
 
 /**
@@ -83,7 +83,7 @@ export function RestoreSyncWindows(operationID: string): $CancellablePromise<voi
  * participant's identity and the target mappings.
  */
 export function ResumeSync(operationID: string): $CancellablePromise<$models.SyncStateView> {
-    return $Call.ByID(1585605416, operationID);
+    return $Call.ByID(1244477266, operationID);
 }
 
 /**
@@ -94,12 +94,12 @@ export function ResumeSync(operationID: string): $CancellablePromise<$models.Syn
  * aborts the whole start with everything cleaned up.
  */
 export function StartSync(operationID: string, masterID: string, followerIDs: string[] | null): $CancellablePromise<$models.SyncStateView> {
-    return $Call.ByID(4265453979, operationID, masterID, followerIDs);
+    return $Call.ByID(179008001, operationID, masterID, followerIDs);
 }
 
 /**
  * StopSync ends the session and releases every resource.
  */
 export function StopSync(operationID: string): $CancellablePromise<$models.SyncStateView> {
-    return $Call.ByID(3647572519, operationID);
+    return $Call.ByID(3456815841, operationID);
 }

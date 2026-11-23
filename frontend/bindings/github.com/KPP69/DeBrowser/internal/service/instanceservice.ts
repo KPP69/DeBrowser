@@ -35,7 +35,7 @@ import * as $models from "./models.js";
  * CreateInstance creates an instance (recorded, unified recording).
  */
 export function CreateInstance(operationID: string, input: $models.CreateInstanceInput): $CancellablePromise<model$0.Instance> {
-    return $Call.ByID(1021165291, operationID, input);
+    return $Call.ByID(985557741, operationID, input);
 }
 
 /**
@@ -47,7 +47,7 @@ export function CreateInstance(operationID: string, input: $models.CreateInstanc
  * unified recording).
  */
 export function DeleteInstance(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(3072793292, operationID, id);
+    return $Call.ByID(2989804558, operationID, id);
 }
 
 /**
@@ -81,14 +81,14 @@ export function DeleteInstance(operationID: string, id: string): $CancellablePro
  * directory (recorded with per-phase steps, unified recording).
  */
 export function DeleteInstanceAndProfile(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(1852242710, operationID, id);
+    return $Call.ByID(3294103240, operationID, id);
 }
 
 /**
  * GetInstance returns one instance.
  */
 export function GetInstance(id: string): $CancellablePromise<model$0.Instance> {
-    return $Call.ByID(403090779, id);
+    return $Call.ByID(3042394029, id);
 }
 
 /**
@@ -101,7 +101,7 @@ export function GetInstance(id: string): $CancellablePromise<model$0.Instance> {
  * counts as confirmed stopped; with a record it stays unknown.
  */
 export function InstanceBookmarkAccess(id: string): $CancellablePromise<[model$0.Instance, string, string]> {
-    return $Call.ByID(1380432297, id);
+    return $Call.ByID(1246543939, id);
 }
 
 /**
@@ -110,14 +110,14 @@ export function InstanceBookmarkAccess(id: string): $CancellablePromise<[model$0
  * availableProfiles for the safety rules).
  */
 export function ListAvailableProfiles(): $CancellablePromise<model$0.ProfileDirInfo[] | null> {
-    return $Call.ByID(1706145673);
+    return $Call.ByID(787283331);
 }
 
 /**
  * ListInstances returns all instances in display order.
  */
 export function ListInstances(): $CancellablePromise<model$0.Instance[] | null> {
-    return $Call.ByID(3377235084);
+    return $Call.ByID(1127233450);
 }
 
 /**
@@ -127,14 +127,14 @@ export function ListInstances(): $CancellablePromise<model$0.Instance[] | null> 
  * constructor, before an Auditor can exist).
  */
 export function ReportReconciliation(): $CancellablePromise<void> {
-    return $Call.ByID(1131427935);
+    return $Call.ByID(3932566265);
 }
 
 /**
  * StartInstance launches the instance's browser (recorded).
  */
 export function StartInstance(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(2083354835, operationID, id);
+    return $Call.ByID(1054115089, operationID, id);
 }
 
 /**
@@ -143,7 +143,7 @@ export function StartInstance(operationID: string, id: string): $CancellableProm
  * this instance is ever asked to close.
  */
 export function StopInstance(operationID: string, id: string): $CancellablePromise<void> {
-    return $Call.ByID(2872543479, operationID, id);
+    return $Call.ByID(2510857001, operationID, id);
 }
 
 /**
@@ -154,14 +154,14 @@ export function StopInstance(operationID: string, id: string): $CancellablePromi
  * reports Verified=false and must not join synchronization.
  */
 export function SyncRuntimeInfo(id: string): $CancellablePromise<[$models.SyncRuntimeInfo, boolean]> {
-    return $Call.ByID(3339661473, id);
+    return $Call.ByID(1687936351, id);
 }
 
 /**
  * UpdateInstance updates an instance (recorded, unified recording).
  */
 export function UpdateInstance(operationID: string, input: $models.UpdateInstanceInput): $CancellablePromise<model$0.Instance> {
-    return $Call.ByID(1861349874, operationID, input);
+    return $Call.ByID(3887226908, operationID, input);
 }
 
 /**
@@ -171,5 +171,5 @@ export function UpdateInstance(operationID: string, input: $models.UpdateInstanc
  * path). Used before window operations and on session resume.
  */
 export function VerifySyncIdentity(info: $models.SyncRuntimeInfo): $CancellablePromise<boolean> {
-    return $Call.ByID(4270707828, info);
+    return $Call.ByID(3656076370, info);
 }
