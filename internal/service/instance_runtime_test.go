@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/runner"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/runner"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // A scriptable fake Launcher/Process pair: the service's runtime

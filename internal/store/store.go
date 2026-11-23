@@ -11,7 +11,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/database"
 )
 
 // querier is the subset of *sql.DB and *sql.Tx the repositories use,

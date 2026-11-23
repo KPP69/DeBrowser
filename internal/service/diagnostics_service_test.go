@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/paths"
 )
 
 type diagFixture struct {

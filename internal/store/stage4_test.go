@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // The tests in this file cover Stage 4-era tables (proxies,

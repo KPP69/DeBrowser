@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/settings"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/settings"
 )
 
 func testService(t *testing.T) *AppService {

@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/onbeee/DeBrowser/internal/safedelete"
+	"github.com/KPP69/DeBrowser/internal/safedelete"
 )
 
 // platformState holds the two pinned directory descriptors the

@@ -5,7 +5,7 @@ import {
   type DiagnosticsView,
   type ExportResult,
   type LogExportInfo,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { useAppStore } from "../stores/useAppStore";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";

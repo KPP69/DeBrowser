@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/paths"
-	"github.com/onbeee/DeBrowser/internal/pfiles"
-	"github.com/onbeee/DeBrowser/internal/runner"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/pfiles"
+	"github.com/KPP69/DeBrowser/internal/runner"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // InstanceService is the browser-instance management service exposed

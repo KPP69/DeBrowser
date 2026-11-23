@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/paths"
+	"github.com/KPP69/DeBrowser/internal/paths"
 )
 
 // openV1Database builds a database migrated only to version 1 (the

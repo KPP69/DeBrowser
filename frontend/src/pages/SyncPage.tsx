@@ -5,7 +5,7 @@ import {
   type SyncCandidate,
   type SyncMonitor,
   type SyncStateView,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import {

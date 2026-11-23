@@ -18,11 +18,11 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/lifecycle"
-	"github.com/onbeee/DeBrowser/internal/service"
-	"github.com/onbeee/DeBrowser/internal/singleinstance"
-	"github.com/onbeee/DeBrowser/internal/version"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/lifecycle"
+	"github.com/KPP69/DeBrowser/internal/service"
+	"github.com/KPP69/DeBrowser/internal/singleinstance"
+	"github.com/KPP69/DeBrowser/internal/version"
 )
 
 // App owns the Wails application and its background loops.

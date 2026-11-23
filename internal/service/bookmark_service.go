@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/onbeee/DeBrowser/internal/chromebookmarks"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/chromebookmarks"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // BookmarkService implements Stage 9C bookmark management: the

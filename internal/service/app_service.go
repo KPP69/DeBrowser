@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/settings"
-	"github.com/onbeee/DeBrowser/internal/version"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/settings"
+	"github.com/KPP69/DeBrowser/internal/version"
 )
 
 // StatusEvent is the typed Wails event carrying Status snapshots.

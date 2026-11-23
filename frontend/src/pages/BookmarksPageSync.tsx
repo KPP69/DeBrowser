@@ -5,8 +5,8 @@ import {
   type ApplySearchResult,
   type BookmarkInstanceInfo,
   type BookmarkSearchResult,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
-import type { BookmarkNode } from "../../bindings/github.com/onbeee/DeBrowser/internal/model";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
+import type { BookmarkNode } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import { notify, notifyError, notifyWarning } from "../stores/useNotificationStore";
 import { classifyApplyResult, classifySyncResult } from "../lib/operationResult";

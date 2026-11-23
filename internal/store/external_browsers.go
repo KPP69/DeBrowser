@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // External browser repository (Stage 9A). These rows are PURE

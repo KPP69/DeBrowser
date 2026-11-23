@@ -11,7 +11,7 @@ package logging
 import (
 	"log/slog"
 
-	"github.com/onbeee/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/config"
 )
 
 // ParseLevel converts a config log level string into a slog.Level.

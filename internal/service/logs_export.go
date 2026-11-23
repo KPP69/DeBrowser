@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/version"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/version"
 )
 
 // Log record exports and capacity management (unified recording

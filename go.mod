@@ -1,4 +1,4 @@
-module github.com/onbeee/DeBrowser
+module github.com/KPP69/DeBrowser
 
 go 1.26.0
 

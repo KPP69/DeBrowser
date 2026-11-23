@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/runner"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/runner"
 )
 
 // Persistence failure handling for the "unknown" hold: the

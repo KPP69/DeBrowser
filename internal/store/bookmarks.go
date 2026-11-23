@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 const bookmarkColumns = `id, name, url, instance_id, sort_order, created_at, updated_at`

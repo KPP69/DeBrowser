@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/chromebookmarks"
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/chromebookmarks"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // End-to-end regression for the Chromium profile path fix: an

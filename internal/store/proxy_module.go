@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // --- Sources ---

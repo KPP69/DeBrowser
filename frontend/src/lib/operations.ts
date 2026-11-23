@@ -1,7 +1,7 @@
 import {
   DiagnosticsService,
   type ClientEventInput,
-} from "../../bindings/github.com/onbeee/DeBrowser/internal/service";
+} from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 
 /**
  * 统一记录的前端接入：每次用户操作生成一个 operation_id，

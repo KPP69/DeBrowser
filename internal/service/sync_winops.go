@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/winmgr"
+	"github.com/KPP69/DeBrowser/internal/winmgr"
 )
 
 // Window management for synchronization: resolving an

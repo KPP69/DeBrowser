@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/logging"
 )
 
 // Unified recording: user-initiated instance mutations produce

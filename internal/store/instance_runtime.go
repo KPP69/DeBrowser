@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 // UpsertInstanceRuntime records (or replaces) the process identity

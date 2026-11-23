@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/store"
-	"github.com/onbeee/DeBrowser/internal/version"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/version"
 )
 
 // DiagnosticsService backs the data-management page: a read-only

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/onbeee/DeBrowser/internal/chromebookmarks"
-	"github.com/onbeee/DeBrowser/internal/model"
-	"github.com/onbeee/DeBrowser/internal/store"
+	"github.com/KPP69/DeBrowser/internal/chromebookmarks"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/store"
 )
 
 // Bookmark file access gate states (Stage 9C). Reading or writing

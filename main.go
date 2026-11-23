@@ -29,13 +29,13 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/onbeee/DeBrowser/internal/app"
-	"github.com/onbeee/DeBrowser/internal/config"
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/logging"
-	"github.com/onbeee/DeBrowser/internal/secrets"
-	"github.com/onbeee/DeBrowser/internal/service"
-	"github.com/onbeee/DeBrowser/internal/singleinstance"
+	"github.com/KPP69/DeBrowser/internal/app"
+	"github.com/KPP69/DeBrowser/internal/config"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/secrets"
+	"github.com/KPP69/DeBrowser/internal/service"
+	"github.com/KPP69/DeBrowser/internal/singleinstance"
 )
 
 //go:embed all:frontend/dist

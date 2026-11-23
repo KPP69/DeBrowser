@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onbeee/DeBrowser/internal/database"
-	"github.com/onbeee/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/database"
+	"github.com/KPP69/DeBrowser/internal/model"
 )
 
 func newTestStore(t *testing.T) *Store {
