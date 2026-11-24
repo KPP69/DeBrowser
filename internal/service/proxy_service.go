@@ -717,29 +717,54 @@ func (s *ProxyService) refreshSource(id string) (SourceView, error) {
 	return SourceView{ID: src.ID, Name: src.Name, Kind: src.Kind, NodeCount: len(nodes)}, nil
 }
 
-// replaceNodesLocked swaps one source's whole node set for
-// the parsed nodes in a single transaction. Caller holds
-// s.mu and has fully parsed the new content already, so a
-// failed update never reaches this point and the old nodes
-// stay untouched. Bindings to vanished nodes cascade away
-// with them.
+// replaceNodesLocked reconciles one source's node set with the parsed
+// nodes in a single transaction. Caller holds s.mu and has fully parsed
+// the new content already, so a failed update never reaches this point
+// and the old nodes stay untouched. Nodes are matched by name: a node
+// that still exists keeps its ID (and therefore its instance bindings),
+// only its definition is refreshed; nodes that really disappeared are
+// deleted, and their bindings cascade away with them.
 func (s *ProxyService) replaceNodesLocked(ctx context.Context, sourceID string, nodes []parsedNode) error {
 	return s.store.WithTx(ctx, func(tx *store.Store) error {
-		if err := tx.DeleteProxyNodesOfSource(ctx, sourceID); err != nil {
+		existing, err := tx.ListProxyNodesOfSource(ctx, sourceID)
+		if err != nil {
 			return err
 		}
+		byName := make(map[string]model.ProxyNode, len(existing))
+		for _, n := range existing {
+			byName[n.Name] = n
+		}
+		kept := make(map[string]bool, len(nodes))
 		for _, n := range nodes {
-			nid, err := store.NewID()
-			if err != nil {
-				return err
-			}
 			cfgJSON, err := json.Marshal(n.cfg)
 			if err != nil {
 				return err
 			}
+			config := string(cfgJSON)
+			if old, ok := byName[n.name]; ok {
+				kept[old.ID] = true
+				if old.ConfigJSON != config {
+					if err := tx.UpdateProxyNodeConfig(ctx, old.ID, config); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+			nid, err := store.NewID()
+			if err != nil {
+				return err
+			}
 			if err := tx.CreateProxyNode(ctx, model.ProxyNode{
-				ID: nid, SourceID: sourceID, Name: n.name, ConfigJSON: string(cfgJSON),
+				ID: nid, SourceID: sourceID, Name: n.name, ConfigJSON: config,
 			}); err != nil {
+				return err
+			}
+		}
+		for _, old := range existing {
+			if kept[old.ID] {
+				continue
+			}
+			if err := tx.DeleteProxyNode(ctx, old.ID); err != nil {
 				return err
 			}
 		}
