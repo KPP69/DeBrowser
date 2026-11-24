@@ -8,6 +8,7 @@ import {
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
+import { useAppStore } from "../stores/useAppStore";
 import {
   canStart,
   phaseControls,
@@ -22,6 +23,7 @@ import {
  * 状态与使用说明，不读取或显示任何网页内容。
  */
 export default function SyncPage() {
+  const appPage = useAppStore((state) => state.page);
   const [candidates, setCandidates] = useState<SyncCandidate[]>([]);
   const [state, setState] = useState<SyncStateView | null>(null);
   const [monitors, setMonitors] = useState<SyncMonitor[]>([]);
@@ -98,9 +100,15 @@ export default function SyncPage() {
   useEffect(() => {
     void refresh();
     loadMonitors();
+  }, [refresh, loadMonitors]);
+
+  // 页面隐藏时停止轮询：保活后所有页面常驻，后台页面不应继续抢 IPC。
+  useEffect(() => {
+    if (appPage !== "sync") return;
+    void refresh();
     const t = setInterval(() => void refresh(), 2500);
     return () => clearInterval(t);
-  }, [refresh, loadMonitors]);
+  }, [refresh, appPage]);
 
   const run = async (
     action: string,
