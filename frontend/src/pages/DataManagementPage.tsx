@@ -303,7 +303,7 @@ export default function DataManagementPage() {
             <span className="w-20 shrink-0">存储容量</span>
             <span className="min-w-0 flex-1">
               {view
-                ? `${formatCapacity(view.logCapacityLimitBytes)} / ${formatCapacity(view.logRemainingBytes)}`
+                ? `上限 ${formatCapacity(view.logCapacityLimitBytes)} · 已用 ${formatBytes(view.logUsedBytes)}`
                 : "加载中…"}
             </span>
             <button
