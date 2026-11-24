@@ -758,7 +758,7 @@ export default function InstancesPage() {
               <AppWindow size={22} />
             </span>
             <p className="mt-3 text-sm text-(--text-dim)">暂无浏览器实例</p>
-            <p className="mt-1 text-xs text-(--text-faint)">点击右上角「新建实例」创建第一个实例。</p>
+            <p className="mt-1 text-xs text-(--text-faint)">点击上方「新建实例」创建第一个实例。</p>
           </div>
         ) : (
           <table className="w-full text-sm">
