@@ -87,7 +87,6 @@ func run() error {
 	// running instance to focus its window and exits successfully.
 	lock, err := singleinstance.Acquire(cfg.Layout.InstanceLock)
 	if err != nil {
-		_ = failStart("获取单实例锁失败", err)
 		var already *singleinstance.AlreadyRunningError
 		if errors.As(err, &already) {
 			if serr := singleinstance.SignalActivation(cfg.Layout.ActivationFile); serr != nil {
@@ -98,6 +97,7 @@ func run() error {
 			fmt.Fprintf(os.Stderr, "DeBrowser 已在运行（进程 %d），已尝试唤起现有窗口。\n", already.PID)
 			return nil
 		}
+		_ = failStart("获取单实例锁失败", err)
 		logger.Error("single-instance lock failed", "error", err)
 		return err
 	}
