@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dialog, DialogLayer } from "../components/Modal";
+import { Dialog } from "../components/Modal";
 import {
   ChevronDown,
   Layers,
@@ -14,7 +14,7 @@ import {
   type BrowserView,
   type NodeView,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
-import type { Instance, ProfileDirInfo } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
+import type { Instance } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { useAppStore } from "../stores/useAppStore";
 import { notify, notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { classifyCounts } from "../lib/operationResult";
@@ -36,6 +36,7 @@ import {
 import DeleteDialogs from "../components/instances/DeleteDialogs";
 import BatchCreateDialog, { type BatchCreateState } from "../components/instances/BatchCreateDialog";
 import InstanceTable from "../components/instances/InstanceTable";
+import ProfilePickerDialog, { type ProfilePickerState } from "../components/instances/ProfilePickerDialog";
 import { inputCls, labelCls, modeButtonCls, modeGroupCls } from "../components/instances/formStyles";
 
 interface FormState {
@@ -90,11 +91,6 @@ function notifyBatchResult(
 // The instance-file picker dialog: the options are fetched fresh
 // at open time (never the form-open cache), exactly one may be
 // picked, and nothing is applied until 「选择」 confirms.
-interface ProfilePickerState {
-  options: ProfileDirInfo[];
-  picked: string;
-}
-
 const BATCH_VERB: Record<BatchAction, string> = { start: "启动", stop: "关闭", delete: "删除" };
 const BATCH_OP_ACTION: Record<BatchAction, string> = {
   start: "instance.start",
@@ -1014,44 +1010,12 @@ export default function InstancesPage() {
       )}
 
       {profilePicker && form && (
-        <DialogLayer open onClose={() => setProfilePicker(null)} zIndex={20}>
-          <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
-            <h3 className="text-base font-semibold">选择实例文件</h3>
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-md border border-(--border)">
-              {profilePicker.options.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  aria-pressed={profilePicker.picked === p.name}
-                  onClick={() => setProfilePicker({ ...profilePicker, picked: p.name })}
-                  className={`block w-full px-3 py-2 text-left hover:bg-(--hover-bg) ${
-                    profilePicker.picked === p.name ? "bg-(--hover-bg)" : ""
-                  }`}
-                >
-                  <span className="text-sm font-medium text-(--text-main)">{p.name}</span>
-                  <span className="block truncate text-xs text-(--text-faint)">{p.path}</span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex shrink-0 justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setProfilePicker(null)}
-                className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--text-dim) hover:bg-(--hover-bg)"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={!profilePicker.picked}
-                onClick={confirmProfilePicker}
-                className="rounded-md bg-(--accent) px-3 py-1.5 text-sm font-medium text-(--accent-contrast) hover:opacity-90 disabled:opacity-50"
-              >
-                选择
-              </button>
-            </div>
-          </div>
-        </DialogLayer>
+        <ProfilePickerDialog
+          picker={profilePicker}
+          onPick={(name) => setProfilePicker({ ...profilePicker, picked: name })}
+          onConfirm={confirmProfilePicker}
+          onCancel={() => setProfilePicker(null)}
+        />
       )}
 
       <DeleteDialogs
