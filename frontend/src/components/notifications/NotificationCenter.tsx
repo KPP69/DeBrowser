@@ -92,7 +92,7 @@ export default function NotificationCenter() {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/30" onClick={() => setCenterOpen(false)} />
+      <div className="absolute inset-0 bg-(--overlay)" onClick={() => setCenterOpen(false)} />
       <aside className="notification-drawer absolute right-0 top-0 flex h-full w-[380px] max-w-[92vw] flex-col border-l border-(--border) bg-(--panel-bg) shadow-xl">
         <div className="flex shrink-0 items-center gap-2 border-b border-(--border) px-4 py-3">
           <h2 className="text-[15px] font-semibold">通知台</h2>
