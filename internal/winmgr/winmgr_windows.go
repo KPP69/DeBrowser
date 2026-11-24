@@ -4,6 +4,7 @@ package winmgr
 
 import (
 	"fmt"
+	"sync"
 	"syscall"
 	"unsafe"
 )
@@ -142,65 +143,87 @@ type monitorInfo struct {
 
 const monitorInfoPrimary = 0x1
 
-func listMonitors() ([]Monitor, error) {
-	var monitors []Monitor
-	cb := syscall.NewCallback(func(hMonitor uintptr, _ uintptr, _ uintptr, _ uintptr) uintptr {
-		info := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
-		ret, _, _ := procGetMonitorInfoW.Call(hMonitor, uintptr(unsafe.Pointer(&info)))
-		if ret == 0 {
-			return 1
-		}
-		m := Monitor{
-			ID:        len(monitors),
-			Primary:   info.Flags&monitorInfoPrimary != 0,
-			WorkArea:  info.Work.toRect(),
-			DeviceKey: syscall.UTF16ToString(info.DeviceName[:]),
-		}
-		monitors = append(monitors, m)
+// Enumeration state is shared by the two package-level callbacks below.
+// syscall.NewCallback slots are a fixed, unreleasable resource (the Go
+// runtime only has a small table of them), so each callback must be
+// created exactly once for the lifetime of the process and guarded by a
+// mutex for the duration of one enumeration.
+var (
+	enumMu           sync.Mutex
+	enumMonitors     []Monitor
+	enumWindowPID    int
+	enumWindowResult []WindowInfo
+)
+
+var enumMonitorsCallback = syscall.NewCallback(func(hMonitor uintptr, _ uintptr, _ uintptr, _ uintptr) uintptr {
+	info := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
+	ret, _, _ := procGetMonitorInfoW.Call(hMonitor, uintptr(unsafe.Pointer(&info)))
+	if ret == 0 {
 		return 1
+	}
+	enumMonitors = append(enumMonitors, Monitor{
+		ID:        len(enumMonitors),
+		Primary:   info.Flags&monitorInfoPrimary != 0,
+		WorkArea:  info.Work.toRect(),
+		DeviceKey: syscall.UTF16ToString(info.DeviceName[:]),
 	})
-	ret, _, err := procEnumDisplayMonitors.Call(0, 0, cb, 0)
+	return 1
+})
+
+var enumProcessWindowsCallback = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+	var owner uint32
+	_, _, _ = procGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&owner)))
+	if int(owner) != enumWindowPID {
+		return 1
+	}
+	visible, _, _ := procIsWindowVisible.Call(hwnd)
+	if visible == 0 {
+		return 1
+	}
+	info := WindowInfo{HWND: hwnd}
+	var classBuf [256]uint16
+	n, _, _ := procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&classBuf[0])), uintptr(len(classBuf)))
+	if n > 0 {
+		info.ClassName = syscall.UTF16ToString(classBuf[:n])
+	}
+	var titleBuf [512]uint16
+	n, _, _ = procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&titleBuf[0])), uintptr(len(titleBuf)))
+	if n > 0 {
+		info.Title = syscall.UTF16ToString(titleBuf[:n])
+	}
+	if r, err := windowScreenRect(hwnd); err == nil {
+		info.Area = int64(r.Width) * int64(r.Height)
+	}
+	enumWindowResult = append(enumWindowResult, info)
+	return 1
+})
+
+func listMonitors() ([]Monitor, error) {
+	enumMu.Lock()
+	defer enumMu.Unlock()
+	enumMonitors = enumMonitors[:0]
+	ret, _, err := procEnumDisplayMonitors.Call(0, 0, enumMonitorsCallback, 0)
 	if ret == 0 {
 		return nil, fmt.Errorf("枚举显示器失败：%w", err)
 	}
-	return monitors, nil
+	out := make([]Monitor, len(enumMonitors))
+	copy(out, enumMonitors)
+	return out, nil
 }
 
 func listProcessWindows(pid int) ([]WindowInfo, error) {
 	if pid <= 0 {
 		return nil, fmt.Errorf("进程号无效")
 	}
-	var out []WindowInfo
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-		var owner uint32
-		_, _, _ = procGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&owner)))
-		if int(owner) != pid {
-			return 1
-		}
-		visible, _, _ := procIsWindowVisible.Call(hwnd)
-		if visible == 0 {
-			return 1
-		}
-		info := WindowInfo{HWND: hwnd}
-		var classBuf [256]uint16
-		n, _, _ := procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&classBuf[0])), uintptr(len(classBuf)))
-		if n > 0 {
-			info.ClassName = syscall.UTF16ToString(classBuf[:n])
-		}
-		var titleBuf [512]uint16
-		n, _, _ = procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&titleBuf[0])), uintptr(len(titleBuf)))
-		if n > 0 {
-			info.Title = syscall.UTF16ToString(titleBuf[:n])
-		}
-		if r, err := windowScreenRect(hwnd); err == nil {
-			info.Area = int64(r.Width) * int64(r.Height)
-		}
-		out = append(out, info)
-		return 1
-	})
-	ret, _, err := procEnumWindows.Call(cb, 0)
+	enumMu.Lock()
+	defer enumMu.Unlock()
+	enumWindowPID = pid
+	enumWindowResult = enumWindowResult[:0]
+	ret, _, err := procEnumWindows.Call(enumProcessWindowsCallback, 0)
 	if ret == 0 {
 		return nil, fmt.Errorf("枚举窗口失败：%w", err)
 	}
+	out := make([]WindowInfo, len(enumWindowResult))
+	copy(out, enumWindowResult)
 	return out, nil
 }
