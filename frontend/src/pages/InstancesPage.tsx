@@ -30,21 +30,15 @@ import {
   kernelOptionLabels,
   planBatch,
   planBatchCreate,
+  profileFolderOf,
   pruneSelection,
   sortInstancesByName,
+  ACTIVE_STATUSES,
   MAX_BATCH_CREATE,
+  STATUS_LABEL,
   type BatchAction,
   type BatchPlanItem,
 } from "./instancesLogic";
-
-const STATUS_LABEL: Record<string, string> = {
-  stopped: "已关闭",
-  starting: "启动中",
-  running: "运行中",
-  stopping: "关闭中",
-  error: "异常",
-  unknown: "无法确认",
-};
 
 // Three statuses get a small colored dot plus matching text
 // color, using the shared theme tokens (gray / ok-green /
@@ -55,17 +49,6 @@ const STATUS_DOT: Record<string, { dot: string; text: string }> = {
   running: { dot: "bg-(--ok)", text: "text-(--ok)" },
   unknown: { dot: "bg-(--danger)", text: "text-(--danger)" },
 };
-
-// Statuses in which the instance's browser may be alive: kernel
-// and instance-file changes, and deletion, are refused (the
-// backend enforces the same gates).
-const ACTIVE_STATUSES = new Set(["running", "starting", "stopping", "unknown"]);
-
-function profileFolderOf(inst: Instance): string {
-  return inst.userDataDir.startsWith("profiles/")
-    ? inst.userDataDir.slice("profiles/".length)
-    : inst.userDataDir;
-}
 
 interface FormState {
   id?: string;

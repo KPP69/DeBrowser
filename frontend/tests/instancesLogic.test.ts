@@ -10,7 +10,10 @@ import {
   pruneSelection,
   planBatchCreate,
   kernelOptionLabels,
+  profileFolderOf,
+  ACTIVE_STATUSES,
   MAX_BATCH_CREATE,
+  STATUS_LABEL,
 } from "../src/pages/instancesLogic.ts";
 
 const key = (name: string, createdAt = "2026-01-01T00:00:00Z", id = name) => ({
@@ -164,4 +167,36 @@ test("kernelOptionLabels: names only, duplicates get a numeric suffix", () => {
     assert.ok(!label.includes(":\\"), "label must not contain a path");
     assert.ok(!label.includes(".exe"), "label must not contain an executable name");
   }
+});
+
+test("status labels cover every known instance status", () => {
+  assert.deepEqual(STATUS_LABEL, {
+    stopped: "已关闭",
+    starting: "启动中",
+    running: "运行中",
+    stopping: "关闭中",
+    error: "异常",
+    unknown: "无法确认",
+  });
+  for (const label of Object.values(STATUS_LABEL)) {
+    assert.equal(typeof label, "string");
+    assert.ok(label.length > 0);
+  }
+});
+
+test("active statuses are the ones where the browser may be alive", () => {
+  for (const s of ["running", "starting", "stopping", "unknown"]) {
+    assert.equal(ACTIVE_STATUSES.has(s), true, `${s} must be active`);
+  }
+  for (const s of ["stopped", "error", ""]) {
+    assert.equal(ACTIVE_STATUSES.has(s), false, `${s} must not be active`);
+  }
+});
+
+test("profileFolderOf strips the profiles/ prefix only", () => {
+  assert.equal(profileFolderOf({ userDataDir: "profiles/work" }), "work");
+  assert.equal(profileFolderOf({ userDataDir: "profiles/a/b" }), "a/b");
+  assert.equal(profileFolderOf({ userDataDir: "profiles/" }), "");
+  assert.equal(profileFolderOf({ userDataDir: "C:\\data\\x" }), "C:\\data\\x");
+  assert.equal(profileFolderOf({ userDataDir: "" }), "");
 });
