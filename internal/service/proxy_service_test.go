@@ -621,3 +621,44 @@ func TestLegacyDataUntouched(t *testing.T) {
 		t.Fatalf("legacy tables present = %d, want all 3 preserved", legacyTables)
 	}
 }
+
+// Node definitions carry passwords, UUIDs and private keys. They must
+// not sit in SQLite as plain text, while the generated core config
+// (which the core must read) still receives the real values.
+func TestNodeDefinitionsEncryptedAtRest(t *testing.T) {
+	f := testProxyFixture(t)
+	yaml := "proxies:\n" +
+		"  - {name: Sec, type: socks5, server: 127.0.0.1, port: 18101, username: user1, password: pass123}\n"
+	f.stubFetch(yaml, nil)
+	if _, err := f.svc.AddSubscriptionSource("op", "加密测试", testSubURL); err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := f.store.ListProxyNodes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("nodes = %d, want 1", len(nodes))
+	}
+	raw := nodes[0].ConfigJSON
+	if strings.Contains(raw, "pass123") {
+		t.Fatalf("node definition stored in plain text: %s", raw)
+	}
+	if !strings.HasPrefix(raw, nodeConfigSecretPrefix) {
+		t.Fatalf("node definition not encrypted: %s", raw)
+	}
+
+	f.svc.mu.Lock()
+	err = f.svc.regenerateLocked(context.Background())
+	f.svc.mu.Unlock()
+	if err != nil {
+		t.Fatalf("regenerate: %v", err)
+	}
+	content, err := os.ReadFile(f.svc.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "pass123") {
+		t.Fatal("generated core config lost the node password")
+	}
+}
