@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { DialogLayer } from "../components/Modal";
 import { Activity, Database, Timer } from "lucide-react";
 import {
-  DiagnosticsService,
-  type DiagnosticsView,
+  DataService,
+  type DataView,
   type ExportResult,
   type LogExportInfo,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
@@ -56,7 +56,7 @@ function formatUptime(totalSeconds: number): string {
  */
 export default function DataManagementPage() {
   const status = useAppStore((state) => state.status);
-  const [view, setView] = useState<DiagnosticsView | null>(null);
+  const [view, setView] = useState<DataView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   // 记录导出对话框（类别 + 动态日期范围）。
@@ -73,7 +73,7 @@ export default function DataManagementPage() {
   const [capSaving, setCapSaving] = useState(false);
 
   const refresh = useCallback(() => {
-    DiagnosticsService.GetDiagnostics()
+    DataService.GetDataView()
       .then((v) => {
         setView(v);
         setLoadError(null);
@@ -99,7 +99,7 @@ export default function DataManagementPage() {
     setExportStart("");
     setExportEnd("");
     setDialogError(null);
-    DiagnosticsService.GetLogExportInfo(category)
+    DataService.GetLogExportInfo(category)
       .then((info) => {
         setExportInfo(info);
         if (info.hasRecords) {
@@ -119,7 +119,7 @@ export default function DataManagementPage() {
     setExporting(true);
     setDialogError(null);
     const opId = newOperationId();
-    DiagnosticsService.ExportRecords(opId, category, exportStart, exportEnd)
+    DataService.ExportRecords(opId, category, exportStart, exportEnd)
       .then((res: ExportResult) => {
         if (res.cancelled) {
           // 用户主动取消保存对话框：静默关闭，不通知、
@@ -170,7 +170,7 @@ export default function DataManagementPage() {
     setCapSaving(true);
     setCapError(null);
     const opId = newOperationId();
-    DiagnosticsService.SetLogCapacity(opId, bytes)
+    DataService.SetLogCapacity(opId, bytes)
       .then(() => {
         const msg = `日志容量已设置为 ${formatCapacity(bytes)}。`;
         notifySuccess(msg, { operationId: opId, important: true });
