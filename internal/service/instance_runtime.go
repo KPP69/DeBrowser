@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -380,6 +381,14 @@ func (s *InstanceService) applyEffectiveStatuses(list []model.Instance) {
 // operation owns the outcome until it marks the watch
 // persisted.
 func (s *InstanceService) watchProcess(instanceID string, w *procWatch) {
+	// A panic in any watcher must not take the whole application
+	// down; record it and let the instance be reconciled later.
+	defer func() {
+		if r := recover(); r != nil {
+			s.log.Error("instance watcher panic", "instance", instanceID, "panic", r,
+				"stack", string(debug.Stack()))
+		}
+	}()
 	<-w.proc.Exited()
 	s.rtMu.Lock()
 	if s.procs[instanceID] == w {
