@@ -152,7 +152,7 @@ func sanitizeEvent(e *Event) {
 // RecordEvent appends one event to its category stream. It never
 // returns an error and never panics: a logging failure must not
 // fail the business operation it describes. Failures are counted
-// (see WriteErrors) and surface in diagnostics instead of being
+// (see WriteErrors) and surface on the data page instead of being
 // silently ignored or recursively logged.
 func (s *System) RecordEvent(e Event) {
 	if s == nil {
@@ -189,7 +189,7 @@ func (s *System) RecordEvent(e Event) {
 }
 
 // WriteErrors returns how many structured-event writes have failed
-// since startup (degradation signal for diagnostics).
+// since startup (degradation signal for the data page).
 func (s *System) WriteErrors() int64 {
 	if s == nil {
 		return 0
