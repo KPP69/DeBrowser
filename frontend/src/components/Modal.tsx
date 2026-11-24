@@ -1,37 +1,20 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 /**
- * 统一弹窗基类：Esc 关闭、点遮罩关闭、焦点在弹窗内循环、
- * 打开时聚焦首个可聚焦元素（或带 data-autofocus 的元素），
- * 关闭后把焦点还给触发它的元素。Enter 由页脚按钮自己处理，
- * 不做全局提交，避免在文本域里误触发。
+ * 弹窗统一行为：Esc 关闭、Tab 焦点循环、打开时聚焦首个元素
+ * （或带 data-autofocus 的元素）、关闭后把焦点还给触发元素。
+ * 输入框内按 Enter 触发 onSubmit；文本域和按钮不拦截。
  */
-export function Modal({
-  open,
-  title,
-  onClose,
-  children,
-  footer,
-  labelledBy,
-  hideTitle = false,
-  onSubmit,
-}: {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-  footer?: ReactNode;
-  labelledBy?: string;
-  hideTitle?: boolean;
-  onSubmit?: () => void;
-}) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const titleId = labelledBy ?? "modal-title";
-
+export function useDialogBehavior(
+  open: boolean,
+  containerRef: { current: HTMLElement | null },
+  onClose: () => void,
+  onSubmit?: () => void,
+) {
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
+    const panel = containerRef.current;
     if (!panel) return;
     const focusables = () =>
       Array.from(
@@ -75,21 +58,70 @@ export function Modal({
       document.removeEventListener("keydown", onKey);
       previous?.focus?.();
     };
-  }, [open, onClose, onSubmit]);
+  }, [open, containerRef, onClose, onSubmit]);
+}
 
+/**
+ * 弹窗遮罩层：只负责遮罩、点击外部关闭与键盘行为，
+ * 面板内容与样式由调用方提供（便于逐步替换旧弹窗）。
+ */
+export function DialogLayer({
+  open,
+  onClose,
+  onSubmit,
+  zIndex = 10,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit?: () => void;
+  zIndex?: number;
+  children: ReactNode;
+}) {
+  const layerRef = useRef<HTMLDivElement | null>(null);
+  useDialogBehavior(open, layerRef, onClose, onSubmit);
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4"
+      ref={layerRef}
+      style={{ zIndex }}
+      className="fixed inset-0 flex items-center justify-center bg-(--overlay) px-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
+      {children}
+    </div>
+  );
+}
+
+/** 带标题与页脚的弹窗。 */
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  labelledBy,
+  hideTitle = false,
+  onSubmit,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  labelledBy?: string;
+  hideTitle?: boolean;
+  onSubmit?: () => void;
+}) {
+  const titleId = labelledBy ?? "modal-title";
+  return (
+    <DialogLayer open={open} onClose={onClose} onSubmit={onSubmit}>
       <div
-        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={hideTitle ? undefined : titleId}
         className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl"
       >
         {!hideTitle && (
@@ -100,11 +132,12 @@ export function Modal({
         <div className={hideTitle ? "" : "mt-3"}>{children}</div>
         {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
       </div>
-    </div>
+    </DialogLayer>
   );
 }
 
-/** 统一确认弹窗：动词 + 对象、影响说明、数量、危险色。 */export function ConfirmDialog({
+/** 统一确认弹窗：动词 + 对象、影响说明、数量、危险色。 */
+export function ConfirmDialog({
   open,
   title,
   impact,
@@ -177,23 +210,21 @@ export function Modal({
   );
 }
 
-/** 表单类弹窗：沿用 Modal 的 Esc/遮罩/焦点/Enter 行为，标题由内容自带。 */
+/** 表单类弹窗：沿用 Modal 的键盘/焦点行为，标题由内容自带。 */
 export function Dialog({
   open,
   onClose,
   onSubmit,
   children,
-  maxWidth = "",
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit?: () => void;
   children: ReactNode;
-  maxWidth?: string;
 }) {
   return (
     <Modal open={open} title="" hideTitle onClose={onClose} onSubmit={onSubmit}>
-      <div className={maxWidth}>{children}</div>
+      {children}
     </Modal>
   );
 }
