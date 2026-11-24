@@ -57,7 +57,7 @@ type categoryWriter struct {
 	curSize     int64
 	closed      bool
 	writes      int
-	cleanupErr  error // most recent enforcement failure, for diagnostics
+	cleanupErr  error // most recent enforcement failure, for the data page
 	cleanupErrN int
 
 	// onThreshold, when set, is invoked (outside the writer lock)
@@ -232,7 +232,7 @@ func (w *categoryWriter) writeInternal(p []byte) (int, error, func()) {
 }
 
 // enforceLocked applies retention and capacity limits. Failures are
-// recorded for diagnostics and never propagated: log cleanup must
+// recorded for the data page and never propagated: log cleanup must
 // not break logging or startup.
 func (w *categoryWriter) enforceLocked() {
 	files := w.scanLocked()
@@ -278,7 +278,7 @@ func (w *categoryWriter) removeLocked(f fileEntry) {
 	}
 }
 
-// stats snapshots the category's files for diagnostics.
+// stats snapshots the category's files for the data page.
 func (w *categoryWriter) stats() (files []fileEntry, cleanupErr error, cleanupErrN int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
