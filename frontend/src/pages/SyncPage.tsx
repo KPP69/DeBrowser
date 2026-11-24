@@ -9,6 +9,7 @@ import {
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { useAppStore } from "../stores/useAppStore";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 import {
   canStart,
   phaseControls,
@@ -101,6 +102,11 @@ export default function SyncPage() {
     void refresh();
     loadMonitors();
   }, [refresh, loadMonitors]);
+
+  // 显示器列表只在挂载时读过一次：切回本页时重新枚举一次，
+  // 以便接上/拔掉显示器后列表及时更新（首次挂载由上方
+  // 加载逻辑负责）。轮询仍只刷新同步状态，不碰显示器列表。
+  usePageRefresh("sync", loadMonitors);
 
   // 页面隐藏时停止轮询：保活后所有页面常驻，后台页面不应继续抢 IPC。
   useEffect(() => {
