@@ -286,7 +286,7 @@ func (s *BookmarkService) applySearch(token string, groupKeys []string, mutate f
 }
 
 func (s *BookmarkService) applyToInstance(instanceID string, targets []bookmarkTarget, kind string, mutate func(node map[string]any, kind string) error, result *ApplySearchResult) {
-	unlock, _, dir, gate, err := s.instances.LockBookmarkAccess(instanceID)
+	unlock, _, dir, gate, err := s.instances.lockBookmarkAccess(instanceID)
 	if unlock != nil {
 		defer unlock()
 	}
