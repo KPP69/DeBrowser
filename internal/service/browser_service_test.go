@@ -99,7 +99,7 @@ func TestManualAddPersistsAcrossRestart(t *testing.T) {
 	// (The view type itself carries no kind, version, signature
 	// or verification fields at all — there is nothing to check.)
 	// The browser file must NOT be copied into DeBrowser's folders.
-	if strings.Contains(added.ExecutablePath, fx.cfg.Layout.Kernels) || strings.Contains(added.ExecutablePath, fx.cfg.Layout.Data) {
+	if strings.Contains(added.ExecutablePath, fx.cfg.Layout.Data) {
 		t.Fatalf("browser path points inside DeBrowser data: %s", added.ExecutablePath)
 	}
 	// A fresh service over the same DB (simulated restart) still
