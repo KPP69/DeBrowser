@@ -47,7 +47,7 @@ type LogExportInfo struct {
 // category ("all" | "operation" | "error" | "runtime"). Because
 // old records are cleaned up automatically, the range is read
 // from the retained records on every call — never fixed.
-func (s *DiagnosticsService) GetLogExportInfo(category string) (LogExportInfo, error) {
+func (s *DataService) GetLogExportInfo(category string) (LogExportInfo, error) {
 	cats, ok := logExportCategories[category]
 	if !ok {
 		return LogExportInfo{}, fmt.Errorf("未知的记录类别：%s", category)
@@ -82,7 +82,7 @@ type LogCapacityView struct {
 	RemainingBytes int64 `json:"remainingBytes"`
 }
 
-func (s *DiagnosticsService) capacityView() LogCapacityView {
+func (s *DataService) capacityView() LogCapacityView {
 	return LogCapacityView{
 		LimitBytes:     s.logs.CapacityLimit(),
 		UsedBytes:      s.logs.TotalBytes(),
@@ -96,7 +96,7 @@ func (s *DiagnosticsService) capacityView() LogCapacityView {
 // away, cleaning up the oldest records when current usage exceeds
 // it. A cleanup failure is returned as an explicit error — the
 // operation never pretends to have succeeded.
-func (s *DiagnosticsService) SetLogCapacity(operationID string, bytes int64) (LogCapacityView, error) {
+func (s *DataService) SetLogCapacity(operationID string, bytes int64) (LogCapacityView, error) {
 	op := beginOp(s.logs, operationID, "数据管理", "logs.set_capacity", "settings", "")
 	if bytes < logging.MinCapacityBytes || bytes > logging.MaxCapacityBytes {
 		err := fmt.Errorf("日志容量必须在 %d MB 到 %d GB 之间", logging.MinCapacityBytes>>20, logging.MaxCapacityBytes>>30)
@@ -138,7 +138,7 @@ type ClientEventInput struct {
 // RecordClientEvent records one frontend-originated event. It is
 // fire-and-forget for the UI: recording problems never surface as
 // business failures (an invalid category is the only error).
-func (s *DiagnosticsService) RecordClientEvent(input ClientEventInput) error {
+func (s *DataService) RecordClientEvent(input ClientEventInput) error {
 	switch input.Category {
 	case logging.EventCategoryOperation, logging.EventCategoryError, logging.EventCategoryRuntime:
 	default:
@@ -172,7 +172,7 @@ func (s *DiagnosticsService) RecordClientEvent(input ClientEventInput) error {
 // stream for the same operation IDs are attached as clearly
 // separated context files — they are never counted or presented
 // as primary records of the chosen category.
-func (s *DiagnosticsService) ExportRecords(operationID string, category string, startDate string, endDate string) (ExportResult, error) {
+func (s *DataService) ExportRecords(operationID string, category string, startDate string, endDate string) (ExportResult, error) {
 	op := beginOp(s.logs, operationID, "数据管理", "logs.export", "logs", category)
 	cats, ok := logExportCategories[category]
 	if !ok {
@@ -254,8 +254,8 @@ func joinLines(lines [][]byte) []byte {
 }
 
 // exportRecordsTo builds the records ZIP at dest (temp file +
-// atomic replace, exactly like the diagnostics export).
-func (s *DiagnosticsService) exportRecordsTo(dest string, category string, cats []string, from, to time.Time) (ExportSummary, error) {
+// atomic replace, exactly like the log export).
+func (s *DataService) exportRecordsTo(dest string, category string, cats []string, from, to time.Time) (ExportSummary, error) {
 	exportedAt := time.Now()
 	var files []exportFileData
 	primaryCounts := map[string]int{}
