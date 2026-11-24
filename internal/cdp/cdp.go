@@ -197,6 +197,13 @@ func (c *Client) On(method string, h EventHandler) {
 
 func (c *Client) readLoop() {
 	defer c.shutdown()
+	// A malformed frame or handler bug must close this connection,
+	// not crash the application.
+	defer func() {
+		if r := recover(); r != nil {
+			c.shutdown()
+		}
+	}()
 	for {
 		var msg wireMessage
 		if err := wsjson.Read(context.Background(), c.conn, &msg); err != nil {
@@ -234,6 +241,13 @@ func (c *Client) readLoop() {
 // handlers run sequentially, in receive order.
 func (c *Client) dispatchLoop() {
 	defer close(c.drained)
+	// A handler panic ends this connection (and with it the
+	// session or follower that owns it) instead of the process.
+	defer func() {
+		if r := recover(); r != nil {
+			c.shutdown()
+		}
+	}()
 	for {
 		select {
 		case <-c.done:
