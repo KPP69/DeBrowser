@@ -77,6 +77,16 @@ export default function ProxyConfigPage() {
     }
   }, []);
 
+  // 轮询只刷新核心状态：节点、绑定、实例列表在操作后刷新，
+  // 避免每 3 秒整页重渲染。
+  const reloadStatus = useCallback(async () => {
+    try {
+      setStatus(await ProxyService.GetCoreStatus());
+    } catch {
+      // 轮询失败保持上次状态，不打断操作。
+    }
+  }, []);
+
   useEffect(() => {
     void reload().then((message) => {
       if (message) notifyError(`加载代理配置失败：${message}`);
@@ -86,7 +96,7 @@ export default function ProxyConfigPage() {
   // 页面打开期间保持核心状态、绑定与实例列表新鲜（新建的
   // 实例自动出现，删除的实例自动消失）。
   useEffect(() => {
-    const timer = setInterval(() => void reload(), 3000);
+    const timer = setInterval(() => void reloadStatus(), 3000);
     return () => clearInterval(timer);
   }, [reload]);
 
