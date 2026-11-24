@@ -134,7 +134,7 @@ type Recovery struct {
 	// backup parsed; both were quarantined (renamed, not deleted)
 	// and the store started empty.
 	Unrecoverable bool
-	// Quarantined lists the renamed corrupt files, for diagnostics.
+	// Quarantined lists the renamed corrupt files, for the data page.
 	Quarantined []string
 }
 
@@ -776,5 +776,5 @@ func newRef() (string, error) {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32], nil
 }
 
-// Path returns the vault file path (for diagnostics).
+// Path returns the vault file path (for the data page).
 func (s *Store) Path() string { return s.path }
