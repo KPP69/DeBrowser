@@ -307,6 +307,10 @@ export default function InstancesPage() {
 
   const submitForm = async () => {
     if (!form) return;
+    if (!form.name.trim()) {
+      setFormError("实例名称不能为空。");
+      return;
+    }
     if (!browsersLoaded) {
       // Never let a save carry a browserId that was derived from
       // an incompletely loaded registration list.
@@ -346,7 +350,7 @@ export default function InstancesPage() {
         }
         await InstanceService.UpdateInstance(opId, {
           id: form.id,
-          name: form.name,
+          name: form.name.trim(),
           browserId: form.browserId,
           sortOrder: editing.sortOrder,
           profileAction,
@@ -357,7 +361,7 @@ export default function InstancesPage() {
         savedInstanceID = form.id;
       } else {
         const created = await InstanceService.CreateInstance(opId, {
-          name: form.name,
+          name: form.name.trim(),
           browserId: form.browserId,
           profileMode: form.profileMode,
           profileName: form.profileMode === "default" ? "" : form.profileName,
@@ -875,7 +879,7 @@ export default function InstancesPage() {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">{form.id ? "编辑实例" : "新建实例"}</h3>
             <div className="mt-4 space-y-3">
@@ -887,6 +891,9 @@ export default function InstancesPage() {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="例如：工作号"
                 />
+                {!form.name.trim() && (
+                  <p className="mt-1 text-xs text-(--danger)">实例名称不能为空</p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>实例内核{form.id ? "" : "（必选）"}</label>
@@ -1100,7 +1107,7 @@ export default function InstancesPage() {
       )}
 
       {profilePicker && form && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-(--overlay) px-4">
           <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">选择实例文件</h3>
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-md border border-(--border)">
@@ -1141,7 +1148,7 @@ export default function InstancesPage() {
       )}
 
       {pendingDelete && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">删除实例「{pendingDelete.instance.name}」</h3>
             {pendingDelete.withProfile ? (
@@ -1189,7 +1196,7 @@ export default function InstancesPage() {
       )}
 
       {batchDeletePlan && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">批量删除实例</h3>
             <p className="mt-2 shrink-0 text-sm leading-relaxed text-(--text-dim)">
@@ -1234,7 +1241,7 @@ export default function InstancesPage() {
       )}
 
       {batchCreate && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">批量创建实例</h3>
             <div className="mt-4 space-y-3">
