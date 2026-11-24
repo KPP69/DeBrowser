@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/KPP69/DeBrowser/internal/cdp"
@@ -214,6 +215,17 @@ func (s *SyncService) onMasterEvent(sess *syncSession, targetID string, ev PageE
 // watchdog re-verifies participant identities: the master
 // failing ends the session; a follower failing is isolated.
 func (s *SyncService) watchdog(sess *syncSession) {
+	// A panic in the watchdog must not crash the application; end
+	// the session and record the failure instead.
+	defer func() {
+		if r := recover(); r != nil {
+			if s.Auditor != nil {
+				s.Auditor.RecordError("同步", "watchdog 崩溃", fmt.Errorf("%v", r),
+					"internal_error", "internal", "同步内部错误，已停止")
+			}
+			s.teardown(sess, "同步内部错误，已停止")
+		}
+	}()
 	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
 	for {
