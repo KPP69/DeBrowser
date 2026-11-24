@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ConfirmDialog, Dialog } from "../components/Modal";
 import {
   AppWindow,
   ChevronDown,
@@ -879,8 +880,18 @@ export default function InstancesPage() {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
-          <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
+      <Dialog
+        open
+        onClose={() => {
+          if (!busy) {
+            setForm(null);
+            setEditing(null);
+          }
+        }}
+        onSubmit={() => {
+          if (!busy) void submitForm();
+        }}
+      >
             <h3 className="text-base font-semibold">{form.id ? "编辑实例" : "新建实例"}</h3>
             <div className="mt-4 space-y-3">
               <div>
@@ -1102,8 +1113,7 @@ export default function InstancesPage() {
                 保存
               </button>
             </div>
-          </div>
-        </div>
+      </Dialog>
       )}
 
       {profilePicker && form && (
@@ -1147,102 +1157,77 @@ export default function InstancesPage() {
         </div>
       )}
 
-      {pendingDelete && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
-          <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
-            <h3 className="text-base font-semibold">删除实例「{pendingDelete.instance.name}」</h3>
-            {pendingDelete.withProfile ? (
-              <p className="mt-2 text-sm leading-relaxed text-(--text-dim)">
-                将同时删除实例记录和实例文件
-                <span className="font-mono text-xs"> {pendingDelete.instance.userDataDir} </span>
-                中的全部浏览器数据（Cookie、登录状态、历史记录等），此操作不可恢复。
-              </p>
-            ) : (
-              <>
-                <p className="mt-2 text-sm leading-relaxed text-(--text-dim)">
-                  仅删除实例记录，实例文件
-                  <span className="font-mono text-xs"> {pendingDelete.instance.userDataDir} </span>
-                  会保留在磁盘上，之后可以重新绑定到其他实例。
-                </p>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setPendingDelete({ ...pendingDelete, withProfile: true })}
-                  className="mt-3 text-sm text-(--danger) underline underline-offset-2"
-                >
-                  改为同时删除实例文件
-                </button>
-              </>
-            )}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--text-dim) hover:bg-(--hover-bg)"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void confirmDelete()}
-                className="rounded-md bg-(--danger) px-3 py-1.5 text-sm font-medium text-(--danger-contrast) hover:opacity-90 disabled:opacity-50"
-              >
-                {pendingDelete.withProfile ? "确认删除实例及实例文件" : "确认仅删除实例"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `删除实例「${pendingDelete.instance.name}」` : "删除实例"}
+        impact={
+          pendingDelete?.withProfile
+            ? `将同时删除实例记录和实例文件 ${pendingDelete.instance.userDataDir} 中的全部浏览器数据（Cookie、登录状态、历史记录等），此操作不可恢复。`
+            : `仅删除实例记录，实例文件 ${pendingDelete?.instance.userDataDir ?? ""} 会保留在磁盘上，之后可以重新绑定到其他实例。`
+        }
+        count={1}
+        countLabel="个实例"
+        details={
+          pendingDelete && !pendingDelete.withProfile ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setPendingDelete({ ...pendingDelete, withProfile: true })}
+              className="mt-3 text-sm text-(--danger) underline underline-offset-2"
+            >
+              改为同时删除实例文件
+            </button>
+          ) : undefined
+        }
+        confirmLabel={pendingDelete?.withProfile ? "确认删除实例及实例文件" : "确认仅删除实例"}
+        busy={busy}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
 
-      {batchDeletePlan && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
-          <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
-            <h3 className="text-base font-semibold">批量删除实例</h3>
-            <p className="mt-2 shrink-0 text-sm leading-relaxed text-(--text-dim)">
-              将删除 {batchDeleteRunnable.length} 个实例，仅删除实例记录；实例文件会保留在磁盘上，之后可以重新绑定到其他实例。
-            </p>
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-md border border-(--border) px-3 py-2">
-              {batchDeleteRunnable.map((p) => (
-                <p key={p.id} className="py-0.5 text-sm text-(--text-main)">
-                  {p.name}
-                </p>
-              ))}
-            </div>
-            {batchDeleteSkipped.length > 0 && (
-              <p className="mt-2 shrink-0 text-xs text-(--text-faint)">
-                另有 {batchDeleteSkipped.length} 个所选实例不会删除：
-                {batchDeleteSkipped.map((p) => `「${p.name}」${p.reason}`).join("；")}。
+      <ConfirmDialog
+        open={batchDeletePlan !== null}
+        title="批量删除实例"
+        impact="仅删除实例记录；实例文件会保留在磁盘上，之后可以重新绑定到其他实例。"
+        count={batchDeleteRunnable.length}
+        countLabel="个实例"
+        details={
+          <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-(--border) px-3 py-2">
+            {batchDeleteRunnable.map((p) => (
+              <p key={p.id} className="py-0.5 text-sm text-(--text-main)">
+                {p.name}
               </p>
-            )}
-            <div className="mt-5 flex shrink-0 justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setBatchDeletePlan(null)}
-                className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--text-dim) hover:bg-(--hover-bg)"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={batchBusy}
-                onClick={() => {
-                  const plan = batchDeletePlan;
-                  setBatchDeletePlan(null);
-                  void executeBatch("delete", plan);
-                }}
-                className="rounded-md bg-(--danger) px-3 py-1.5 text-sm font-medium text-(--danger-contrast) hover:opacity-90 disabled:opacity-50"
-              >
-                确认删除 {batchDeleteRunnable.length} 个实例
-              </button>
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        }
+        note={
+          batchDeleteSkipped.length > 0
+            ? `另有 ${batchDeleteSkipped.length} 个所选实例不会删除：${batchDeleteSkipped
+                .map((p) => `「${p.name}」${p.reason}`)
+                .join("；")}。`
+            : undefined
+        }
+        confirmLabel={`确认删除 ${batchDeleteRunnable.length} 个实例`}
+        busy={batchBusy}
+        onConfirm={() => {
+          if (!batchDeletePlan) return;
+          const plan = batchDeletePlan;
+          setBatchDeletePlan(null);
+          void executeBatch("delete", plan);
+        }}
+        onCancel={() => setBatchDeletePlan(null)}
+      />
 
       {batchCreate && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
-          <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
+        <Dialog
+          open
+          onClose={() => {
+            if (!batchCreateBusy) setBatchCreate(null);
+          }}
+          onSubmit={() => {
+            if (!batchCreateBusy) void submitBatchCreate();
+          }}
+        >
             <h3 className="text-base font-semibold">批量创建实例</h3>
             <div className="mt-4 space-y-3">
               <div>
@@ -1315,8 +1300,7 @@ export default function InstancesPage() {
                 创建
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
