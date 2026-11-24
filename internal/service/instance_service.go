@@ -393,6 +393,14 @@ func (s *InstanceService) rollbackCreatedDir(abs string) {
 func (s *InstanceService) requireInstanceAtRest(inst model.Instance, action string) error {
 	switch s.effectiveStatus(inst) {
 	case model.StatusStopped, model.StatusError:
+		// A browser that restarted itself (update or crash
+		// recovery) is no longer the tracked process, so the
+		// status says stopped while a live browser still owns
+		// the profile. Refuse when its lockfile is held.
+		if folder := profileFolder(inst.UserDataDir); folder != "" &&
+			profileLocked(filepath.Join(s.layout.Profiles, folder)) {
+			return fmt.Errorf("实例文件正被浏览器占用（可能是浏览器自行重启），请先关闭该实例的浏览器")
+		}
 		return nil
 	case model.StatusUnknown:
 		return fmt.Errorf("实例运行状态无法确认，不能%s", action)
