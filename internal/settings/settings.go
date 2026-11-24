@@ -109,6 +109,14 @@ func Save(file string, s Settings) error {
 		_ = os.Remove(tmpName)
 		return fmt.Errorf("write settings %s: %w", file, err)
 	}
+	// Flush to disk before the rename: an interrupted shutdown must
+	// never leave an empty settings.json, which would fail the next
+	// startup at Load.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("write settings %s: %w", file, err)
+	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmpName)
 		return fmt.Errorf("write settings %s: %w", file, err)
