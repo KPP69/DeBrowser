@@ -818,7 +818,7 @@ func (s *InstanceService) verifiedProfileTarget(stored string) (string, error) {
 		}
 		return "", fmt.Errorf("拒绝删除：无法检查目标路径：%w", err)
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
+	if info.Mode()&os.ModeSymlink != 0 || isReparsePoint(cleanTarget) {
 		return "", fmt.Errorf("拒绝删除：Profile 目录本身是符号链接")
 	}
 	resolvedProfiles, err := resolveFinalPath(cleanProfiles)
