@@ -175,7 +175,6 @@ Go 1.26 + Wails v3.0.0 后端；React 18 + TypeScript + Vite + Tailwind CSS v4 �
 | `data/secrets.vault` | 凭据 Vault |
 | `config/settings.json` | 用户设置（语言、主题、日志容量） |
 | `webview2-data/` | 应用窗口的 WebView2 用户数据 |
-| `kernels/` | 便携布局保留目录（当前无功能使用，见 [DATABASE.md](DATABASE.md) 的历史兼容说明） |
 
 ## 安全与隐私边界
 
