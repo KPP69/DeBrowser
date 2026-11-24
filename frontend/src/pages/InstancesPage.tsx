@@ -172,6 +172,10 @@ export default function InstancesPage() {
   // 列表请求序号：轮询与操作后刷新并发时，只接受最后发出的响应。
   const listSeq = useRef(0);
   const pollFails = useRef(0);
+  // 轮询返回与上次相同的数据时跳过 setState，避免整张表每 2.5 秒
+  // 无意义重渲染一次。
+  const lastListJSON = useRef("");
+  const lastBindingsJSON = useRef("");
   const [pollPaused, setPollPaused] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ verb: string; done: number; total: number; current: string } | null>(null);
@@ -198,7 +202,11 @@ export default function InstancesPage() {
     try {
       const list = await InstanceService.ListInstances();
       if (seq !== listSeq.current) return;
-      setInstances(list ?? []);
+      const nextJSON = JSON.stringify(list ?? []);
+      if (nextJSON !== lastListJSON.current) {
+        lastListJSON.current = nextJSON;
+        setInstances(list ?? []);
+      }
       pollFails.current = 0;
       setPollPaused(false);
     } catch {
@@ -213,7 +221,11 @@ export default function InstancesPage() {
     try {
       const bds = await ProxyService.ListBindings();
       if (seq !== listSeq.current) return;
-      setProxyBindings(bds ?? []);
+      const bindingsJSON = JSON.stringify(bds ?? []);
+      if (bindingsJSON !== lastBindingsJSON.current) {
+        lastBindingsJSON.current = bindingsJSON;
+        setProxyBindings(bds ?? []);
+      }
     } catch {
       // Keep the last known bindings on failure.
     }
@@ -289,10 +301,10 @@ export default function InstancesPage() {
   // Keep run states fresh while the page is open (a browser the
   // user closed directly must flip to 已关闭 without a reload).
   useEffect(() => {
-    if (pollPaused) return;
+    if (pollPaused || appPage !== "instances") return;
     const timer = setInterval(() => void refreshInstances(), 2500);
     return () => clearInterval(timer);
-  }, [refreshInstances, pollPaused]);
+  }, [refreshInstances, pollPaused, appPage]);
 
   // Selection never outlives the displayed list: ids that vanish
   // (deleted instances, reloads) are dropped from the selection.
