@@ -28,7 +28,7 @@
 
 - 模块化单体：一个 Go 二进制内嵌一个 React 前端。Go 负责全部核心业务逻辑（进程管理、实例生命周期、Profile 隔离、浏览器登记、书签、同步、代理、数据库、日志）；React 只负责渲染、交互、表单与前端状态。
 - 前端调用后端只通过 Wails bindings；异步状态通知只通过 Wails 事件。前端不得执行任意命令。
-- 后端服务共七个，注册于 `internal/app`：AppService、InstanceService、BrowserService、BookmarkService、SyncService、ProxyService、DiagnosticsService。跨服务协作使用共享字段或函数字段钩子，不要把内部协作方法暴露为前端可调用的导出方法。
+- 后端服务共七个，注册于 `internal/app`：AppService、InstanceService、BrowserService、BookmarkService、SyncService、ProxyService、DataService。跨服务协作使用共享字段或函数字段钩子，不要把内部协作方法暴露为前端可调用的导出方法。
 - 数据访问分层：`internal/model`（纯数据类型）→ `internal/store`（全部核心 SQL）→ `internal/service`（业务逻辑）。不使用 ORM，不把裸 SQL 散落到各包。
 - `internal/paths` 是便携数据布局的唯一路径来源，业务代码不得自行拼路径。
 
