@@ -169,6 +169,7 @@ export default function InstancesPage() {
   // Batch management state.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ verb: string; done: number; total: number; current: string } | null>(null);
   const [batchDeletePlan, setBatchDeletePlan] = useState<BatchPlanItem[] | null>(null);
   const [batchCreate, setBatchCreate] = useState<BatchCreateState | null>(null);
   const [batchCreateError, setBatchCreateError] = useState<string | null>(null);
@@ -205,13 +206,15 @@ export default function InstancesPage() {
     }
   }, []);
 
-  const load = useCallback(async () => {
+  const loadAll = useCallback(async (initial: boolean) => {
     // Close the editing gate FIRST, before any await: on a reload,
     // a stale browsersLoaded=true from the previous load must not
     // keep editing enabled while the fresh lists are in flight.
     // Only a successful ListBrowsers below re-opens it.
-    setBrowsersLoaded(false);
-    setLoading(true);
+    if (initial) {
+      setBrowsersLoaded(false);
+      setLoading(true);
+    }
     try {
       const list = await InstanceService.ListInstances();
       setInstances(list ?? []);
@@ -224,7 +227,7 @@ export default function InstancesPage() {
       setInstancesError(message);
       notifyError(`加载实例列表失败：${message}`);
     } finally {
-      setLoading(false);
+      if (initial) setLoading(false);
     }
     try {
       const regs = await BrowserService.ListBrowsers();
@@ -248,6 +251,9 @@ export default function InstancesPage() {
       // Keep the last known proxy data.
     }
   }, []);
+
+  const load = useCallback(() => loadAll(true), [loadAll]);
+  const refresh = useCallback(() => loadAll(false), [loadAll]);
 
   useEffect(() => {
     void load();
@@ -382,7 +388,7 @@ export default function InstancesPage() {
       }
       setForm(null);
       setEditing(null);
-      await load();
+      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       notifyError(`保存实例失败：${message}`, { operationId: opId, important: true });
@@ -432,7 +438,7 @@ export default function InstancesPage() {
         recordOperationFeedback(opId, true, `实例已删除（实例文件保留）：${pendingDelete.instance.name}`, "浏览器实例", action);
       }
       setPendingDelete(null);
-      await load();
+      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       notifyError(`删除实例失败：${message}`, { operationId: opId, important: true });
@@ -470,7 +476,10 @@ export default function InstancesPage() {
     const skipped = plan
       .filter((p) => !p.run)
       .map((p) => ({ name: p.name, reason: p.reason }));
-    for (const item of plan.filter((p) => p.run)) {
+    const items = plan.filter((p) => p.run);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      setBatchProgress({ verb, done: i, total: items.length, current: item.name });
       const opId = newOperationId();
       try {
         if (action === "start") await InstanceService.StartInstance(opId, item.id);
@@ -489,6 +498,7 @@ export default function InstancesPage() {
     await refreshInstances();
     setSelectedIds(new Set());
     notifyBatchResult(`批量${verb}完成`, okNames, skipped, failed);
+    setBatchProgress(null);
     setBatchBusy(false);
   };
 
@@ -557,7 +567,7 @@ export default function InstancesPage() {
         }
       }
       setBatchCreate(null);
-      await load();
+      await refresh();
       notifyBatchResult("批量创建完成", okNames, [], failed);
     } catch (err) {
       setBatchCreateError(err instanceof Error ? err.message : String(err));
@@ -650,14 +660,16 @@ export default function InstancesPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-(--accent) px-3 text-sm font-medium text-(--accent-contrast) hover:opacity-90"
+            disabled={batchBusy}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-(--accent) px-3 text-sm font-medium text-(--accent-contrast) hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus size={14} /> 新建实例
           </button>
           <button
             type="button"
             onClick={openBatchCreate}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg)"
+            disabled={batchBusy}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Layers size={14} /> 批量创建
           </button>
@@ -697,6 +709,12 @@ export default function InstancesPage() {
           </button>
         </div>
       </div>
+
+      {batchProgress && (
+        <p className="mt-3 shrink-0 text-xs text-(--text-dim)" role="status">
+          正在批量{batchProgress.verb}：{batchProgress.done}/{batchProgress.total} · 当前 {batchProgress.current}
+        </p>
+      )}
 
       {browsersError && (
         <div className="mt-4 flex shrink-0 items-start gap-2 rounded-lg border border-(--danger-border) bg-(--danger-bg) px-3 py-2 text-sm text-(--danger)">
@@ -811,7 +829,7 @@ export default function InstancesPage() {
                           <button
                             type="button"
                             title="关闭"
-                            disabled={transitioning || actingId === inst.id || inst.status === "stopping"}
+                            disabled={batchBusy || transitioning || actingId === inst.id || inst.status === "stopping"}
                             onClick={() => void runAction(inst, "stop")}
                             className="flex items-center gap-1 rounded px-2 py-1.5 text-xs text-(--text-dim) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -821,7 +839,7 @@ export default function InstancesPage() {
                           <button
                             type="button"
                             title="启动"
-                            disabled={active || transitioning || actingId === inst.id}
+                            disabled={batchBusy || active || transitioning || actingId === inst.id}
                             onClick={() => void runAction(inst, "start")}
                             className="flex items-center gap-1 rounded px-2 py-1.5 text-xs text-(--text-dim) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -831,7 +849,7 @@ export default function InstancesPage() {
                         <button
                           type="button"
                           title={browsersLoaded ? "编辑" : "内核列表加载完成后可编辑"}
-                          disabled={!browsersLoaded || transitioning}
+                          disabled={batchBusy || !browsersLoaded || transitioning}
                           className="rounded p-1.5 text-(--text-dim) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
                           onClick={() => openEdit(inst)}
                         >
@@ -840,7 +858,7 @@ export default function InstancesPage() {
                         <button
                           type="button"
                           title={active ? "实例运行期间不能删除" : "删除实例"}
-                          disabled={active}
+                          disabled={batchBusy || active}
                           onClick={() => setPendingDelete({ instance: inst, withProfile: false })}
                           className="rounded p-1.5 text-(--text-dim) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
                         >
