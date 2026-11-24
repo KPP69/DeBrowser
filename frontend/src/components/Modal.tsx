@@ -3,7 +3,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 /**
  * 弹窗统一行为：Esc 关闭、Tab 焦点循环、打开时聚焦首个元素
  * （或带 data-autofocus 的元素）、关闭后把焦点还给触发元素。
- * 输入框内按 Enter 触发 onSubmit；文本域和按钮不拦截。
+ * 输入框内按 Enter 触发 onSubmit；文本域、按钮、下拉框与带
+ * data-no-submit 标记的输入框不触发提交。
  */
 export function useDialogBehavior(
   open: boolean,
@@ -46,7 +47,20 @@ export function useDialogBehavior(
       if (e.key === "Enter" && submitRef.current) {
         const target = e.target as HTMLElement | null;
         const tag = target?.tagName;
-        if (tag !== "TEXTAREA" && tag !== "BUTTON" && tag !== "A") {
+        // 下拉框的 Enter 用于打开选项，不应提交；带
+        // data-no-submit 的输入框（如节点选择器的搜索框）
+        // 同样不触发提交。
+        const noSubmit =
+          target && typeof target.closest === "function"
+            ? target.closest("[data-no-submit]")
+            : null;
+        if (
+          tag !== "TEXTAREA" &&
+          tag !== "BUTTON" &&
+          tag !== "A" &&
+          tag !== "SELECT" &&
+          !noSubmit
+        ) {
           e.preventDefault();
           submitRef.current();
         }

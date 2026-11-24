@@ -83,6 +83,7 @@ export default function ProxyNodePicker({
               />
               <input
                 autoFocus
+                data-no-submit
                 className="w-full rounded-md border border-(--border) bg-(--input-bg) py-1.5 pl-7 pr-2 text-sm text-(--text-main) outline-none placeholder:text-(--text-faint)"
                 placeholder="搜索节点名称"
                 value={query}
