@@ -152,12 +152,12 @@ export interface CreateLibraryNodeInput {
 }
 
 /**
- * DiagnosticsView is everything the data-management page shows:
+ * DataView is everything the data-management page shows:
  * application and database state, the data directory, instance
  * counts and the logging-system categories (run / operation /
  * error) with the unified capacity figures.
  */
-export interface DiagnosticsView {
+export interface DataView {
     "appName": string;
     "appVersion": string;
     "schemaVersion": number;
