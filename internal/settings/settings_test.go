@@ -11,9 +11,6 @@ func TestDefaultIsChineseLight(t *testing.T) {
 	// light theme by product decision (2026-11-15); a saved user
 	// choice is loaded back unchanged (see the roundtrip test).
 	s := Default()
-	if s.Language != "zh-CN" {
-		t.Errorf("default language = %q, want zh-CN", s.Language)
-	}
 	if s.Theme != ThemeLight {
 		t.Errorf("default theme = %q, want light", s.Theme)
 	}
@@ -32,7 +29,7 @@ func TestLoadMissingFileReturnsDefaults(t *testing.T) {
 func TestSaveLoadRoundtripPersistsTheme(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "settings.json")
 	for _, theme := range []string{ThemeLight, ThemeWarm, ThemeDark} {
-		want := Settings{Language: LanguageZhCN, Theme: theme}
+		want := Settings{Theme: theme}
 		if err := Save(file, want); err != nil {
 			t.Fatalf("Save(%s): %v", theme, err)
 		}
@@ -48,10 +45,7 @@ func TestSaveLoadRoundtripPersistsTheme(t *testing.T) {
 
 func TestSaveRejectsInvalidValues(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "settings.json")
-	if err := Save(file, Settings{Language: "en-US", Theme: ThemeDark}); err == nil {
-		t.Error("Save accepted an unsupported language")
-	}
-	if err := Save(file, Settings{Language: LanguageZhCN, Theme: "blue"}); err == nil {
+	if err := Save(file, Settings{Theme: "blue"}); err == nil {
 		t.Error("Save accepted an unsupported theme")
 	}
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
