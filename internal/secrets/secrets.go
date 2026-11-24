@@ -107,6 +107,14 @@ type Protector interface {
 	Unprotect(blob []byte) ([]byte, error)
 }
 
+// NewProtector returns the platform protector for a standalone
+// secret store that is not the vault. On Windows this is DPAPI
+// (bound to the current user; keyPath is ignored). On the unix
+// development fallback the AES key is kept at keyPath+".key".
+func NewProtector(keyPath string) (Protector, error) {
+	return platformProtector(keyPath)
+}
+
 // RefInfo describes one vault entry without exposing its content.
 type RefInfo struct {
 	Ref       string
