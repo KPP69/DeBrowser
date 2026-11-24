@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dialog } from "../components/Modal";
 import {
-  ChevronDown,
   Layers,
   Plus,
   TriangleAlert,
@@ -20,7 +18,6 @@ import { notify, notifyError, notifySuccess } from "../stores/useNotificationSto
 import { classifyCounts } from "../lib/operationResult";
 import type { NotificationItem } from "../lib/notifications";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
-import ProxyNodePicker from "../components/ProxyNodePicker";
 import {
   kernelOptionLabels,
   planBatch,
@@ -28,7 +25,6 @@ import {
   profileFolderOf,
   pruneSelection,
   sortInstancesByName,
-  ACTIVE_STATUSES,
   MAX_BATCH_CREATE,
   type BatchAction,
   type BatchPlanItem,
@@ -37,30 +33,7 @@ import DeleteDialogs from "../components/instances/DeleteDialogs";
 import BatchCreateDialog, { type BatchCreateState } from "../components/instances/BatchCreateDialog";
 import InstanceTable from "../components/instances/InstanceTable";
 import ProfilePickerDialog, { type ProfilePickerState } from "../components/instances/ProfilePickerDialog";
-import { inputCls, labelCls, modeButtonCls, modeGroupCls } from "../components/instances/formStyles";
-
-interface FormState {
-  id?: string;
-  name: string;
-  // browserId is the ID of one registered browser (「浏览器内核」
-  // page) associated with the instance. The options come only
-  // from actual registrations — never from free text — so an
-  // association always resolves to a real registered path.
-  // Required when creating; on edit, "" clears an association.
-  browserId: string;
-  // Create: "default" | "custom" | "existing".
-  // Edit: "rename" | "swap" (no default option on edit).
-  profileMode: string;
-  profileName: string;
-  // proxyNodeId is the ID of the proxy node this instance is
-  // bound to ("" = 不使用代理). The binding itself lives in
-  // the proxy module's single binding table: this form and the
-  // proxy page read and write the same relation through
-  // ProxyService.
-  proxyNodeId: string;
-}
-
-const EMPTY_FORM: FormState = { name: "", browserId: "", profileMode: "default", profileName: "", proxyNodeId: "" };
+import InstanceFormDialog, { EMPTY_FORM, type FormState } from "../components/instances/InstanceFormDialog";
 
 type PendingDelete = { instance: Instance; withProfile: boolean } | null;
 
@@ -123,8 +96,8 @@ export default function InstancesPage() {
   const [browsersError, setBrowsersError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Instance | null>(null);
   const [loading, setLoading] = useState(true);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formInitial, setFormInitial] = useState<FormState>(EMPTY_FORM);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [busy, setBusy] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -152,6 +125,7 @@ export default function InstancesPage() {
   const [profilePicker, setProfilePicker] = useState<ProfilePickerState | null>(null);
   const [pickerBusy, setPickerBusy] = useState(false);
   const [profileNote, setProfileNote] = useState<string | null>(null);
+  const [appliedProfileName, setAppliedProfileName] = useState<string | null>(null);
 
   // The list is displayed in natural name order; selection and
   // select-all always refer to exactly this displayed list.
@@ -281,14 +255,14 @@ export default function InstancesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(EMPTY_FORM);
-    setFormError(null);
+    setFormInitial(EMPTY_FORM);
+    setFormOpen(true);
     setProfileNote(null);
   };
 
   const openEdit = (inst: Instance) => {
     setEditing(inst);
-    setForm({
+    setFormInitial({
       id: inst.id,
       name: inst.name,
       // A kernelId that no longer resolves to a registration is
@@ -302,70 +276,46 @@ export default function InstancesPage() {
       // cascades), so a missing entry simply means unbound.
       proxyNodeId: proxyBindings.find((b) => b.instanceId === inst.id)?.nodeId ?? "",
     });
-    setFormError(null);
+    setFormOpen(true);
     setProfileNote(null);
   };
 
-  const submitForm = async () => {
-    if (!form) return;
-    if (!form.name.trim()) {
-      setFormError("实例名称不能为空。");
-      return;
-    }
-    if (!browsersLoaded) {
-      // Never let a save carry a browserId that was derived from
-      // an incompletely loaded registration list.
-      setFormError("内核列表尚未加载完成，无法保存。请等待加载完成或重新加载页面。");
-      return;
-    }
-    if (!form.id && !form.browserId) {
-      setFormError("请选择实例内核。");
-      return;
-    }
-    if (!form.id && form.profileMode === "existing" && !form.profileName) {
-      setFormError("请选择实例文件。");
-      return;
-    }
-    if (form.id && form.profileMode === "swap" && !form.profileName) {
-      setFormError("请选择要更换的实例文件。");
-      return;
-    }
-    setFormError(null);
-    setBusy(true);
+  const handleFormSubmit = async (values: FormState) => {
+        setBusy(true);
     const opId = newOperationId();
-    const action = form.id ? "instance.update" : "instance.create";
+    const action = values.id ? "instance.update" : "instance.create";
     let savedInstanceID = "";
     try {
-      if (form.id && editing) {
+      if (values.id && editing) {
         // Translate the form's instance-file choice into a backend
         // action only when it actually changes something.
         let profileAction = "";
         let profileName = "";
         const currentFolder = profileFolderOf(editing);
-        if (form.profileMode === "rename" && form.profileName.trim() !== currentFolder) {
+        if (values.profileMode === "rename" && values.profileName.trim() !== currentFolder) {
           profileAction = "rename";
-          profileName = form.profileName;
-        } else if (form.profileMode === "swap" && form.profileName) {
+          profileName = values.profileName;
+        } else if (values.profileMode === "swap" && values.profileName) {
           profileAction = "swap";
-          profileName = form.profileName;
+          profileName = values.profileName;
         }
         await InstanceService.UpdateInstance(opId, {
-          id: form.id,
-          name: form.name.trim(),
-          browserId: form.browserId,
+          id: values.id,
+          name: values.name.trim(),
+          browserId: values.browserId,
           sortOrder: editing.sortOrder,
           profileAction,
           profileName,
         });
-        notifySuccess(`实例已更新：${form.name}`, { operationId: opId, important: true });
-        recordOperationFeedback(opId, true, `实例已更新：${form.name}`, "浏览器实例", action);
-        savedInstanceID = form.id;
+        notifySuccess(`实例已更新：${values.name}`, { operationId: opId, important: true });
+        recordOperationFeedback(opId, true, `实例已更新：${values.name}`, "浏览器实例", action);
+        savedInstanceID = values.id;
       } else {
         const created = await InstanceService.CreateInstance(opId, {
-          name: form.name.trim(),
-          browserId: form.browserId,
-          profileMode: form.profileMode,
-          profileName: form.profileMode === "default" ? "" : form.profileName,
+          name: values.name.trim(),
+          browserId: values.browserId,
+          profileMode: values.profileMode,
+          profileName: values.profileMode === "default" ? "" : values.profileName,
         });
         notifySuccess(`实例已创建：${created.name}`, { operationId: opId, important: true });
         recordOperationFeedback(opId, true, `实例已创建：${created.name}`, "浏览器实例", action);
@@ -376,22 +326,22 @@ export default function InstancesPage() {
       // itself is already saved; a binding failure is reported
       // separately and never rolls the instance back.
       const currentNodeID = proxyBindings.find((b) => b.instanceId === savedInstanceID)?.nodeId ?? "";
-      if (savedInstanceID && form.proxyNodeId !== currentNodeID) {
+      if (savedInstanceID && values.proxyNodeId !== currentNodeID) {
         const bindOpId = newOperationId();
         try {
-          if (form.proxyNodeId === "") {
+          if (values.proxyNodeId === "") {
             await ProxyService.ClearBinding(bindOpId, savedInstanceID);
           } else {
-            await ProxyService.SetBinding(bindOpId, savedInstanceID, form.proxyNodeId);
+            await ProxyService.SetBinding(bindOpId, savedInstanceID, values.proxyNodeId);
           }
-          recordOperationFeedback(bindOpId, true, `实例代理已更新：${form.name}`, "代理", "proxy.binding_set");
+          recordOperationFeedback(bindOpId, true, `实例代理已更新：${values.name}`, "代理", "proxy.binding_set");
         } catch (bindErr) {
           const message = bindErr instanceof Error ? bindErr.message : String(bindErr);
           notifyError(`实例已保存，但代理设置失败：${message}`, { operationId: bindOpId, important: true });
           recordOperationFeedback(bindOpId, false, `实例代理设置失败：${message}`, "代理", "proxy.binding_set");
         }
       }
-      setForm(null);
+      setFormOpen(false);
       setEditing(null);
       await refresh();
     } catch (err) {
@@ -586,8 +536,8 @@ export default function InstancesPage() {
   // unbound instance file exists right now, the dialog does not
   // open at all and the form keeps its current value.
 
-  const openProfilePicker = async () => {
-    if (!form) return;
+  const openProfilePicker = async (currentProfileName: string) => {
+    if (!formOpen) return;
     setProfileNote(null);
     setPickerBusy(true);
     try {
@@ -599,7 +549,7 @@ export default function InstancesPage() {
       }
       setProfilePicker({
         options,
-        picked: options.some((o) => o.name === form.profileName) ? form.profileName : "",
+        picked: options.some((o) => o.name === currentProfileName) ? currentProfileName : "",
       });
     } catch (err) {
       setProfileNote(`获取实例文件列表失败：${err instanceof Error ? err.message : String(err)}`);
@@ -609,36 +559,13 @@ export default function InstancesPage() {
   };
 
   const confirmProfilePicker = () => {
-    if (!profilePicker || !form || !profilePicker.picked) return;
-    setForm({ ...form, profileName: profilePicker.picked });
+    if (!profilePicker || !profilePicker.picked) return;
+    setAppliedProfileName(profilePicker.picked);
     setProfilePicker(null);
   };
 
-  const editingActive = editing ? ACTIVE_STATUSES.has(editing.status) : false;
-  const editingRunning = editing ? ["running", "starting", "stopping"].includes(editing.status) : false;
-  const editingUnknown = editing?.status === "unknown";
   const allSelected =
     displayInstances.length > 0 && displayInstances.every((i) => selectedIds.has(i.id));
-
-  // The clickable box shown in the form's 选择 mode: it never
-  // expands inline; it opens the picker dialog (or explains why
-  // there is nothing to pick).
-  const profilePickerBox = (disabled: boolean) => (
-    <>
-      <button
-        type="button"
-        disabled={disabled || pickerBusy}
-        onClick={() => void openProfilePicker()}
-        className={`${inputCls} flex items-center justify-between text-left`}
-      >
-        <span className={form?.profileName ? "" : "text-(--text-faint)"}>
-          {form?.profileName || "点击选择实例文件"}
-        </span>
-        <ChevronDown size={14} className="shrink-0 text-(--text-faint)" />
-      </button>
-      {profileNote && <p className="mt-1 text-xs text-(--text-faint)">{profileNote}</p>}
-    </>
-  );
 
   return (
     <div className="mx-auto flex h-full max-w-5xl flex-col px-6 py-6">
@@ -762,254 +689,42 @@ export default function InstancesPage() {
         onDelete={(inst) => setPendingDelete({ instance: inst, withProfile: false })}
       />
 
-      {form && (
-      <Dialog
-        open
-        onClose={() => {
-          if (!busy) {
-            setForm(null);
+      {formOpen && (
+        <InstanceFormDialog
+          editing={editing}
+          initial={formInitial}
+          browsers={browsers}
+          browsersLoaded={browsersLoaded}
+          browsersError={browsersError}
+          proxyNodes={proxyNodes}
+          proxyBindings={proxyBindings}
+          busy={busy}
+          pickerBusy={pickerBusy}
+          profileNote={profileNote}
+          appliedProfileName={appliedProfileName}
+          onAppliedProfileName={() => setAppliedProfileName(null)}
+          onOpenProfilePicker={(currentProfileName) => void openProfilePicker(currentProfileName)}
+          onClearProfileNote={() => setProfileNote(null)}
+          onNavigate={(page) => {
+            setFormOpen(false);
             setEditing(null);
-          }
-        }}
-        onSubmit={() => {
-          if (!busy) void submitForm();
-        }}
-      >
-            <h3 className="text-base font-semibold">{form.id ? "编辑实例" : "新建实例"}</h3>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className={labelCls}>实例名称</label>
-                <input
-                  className={inputCls}
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="例如：工作号"
-                />
-                {!form.name.trim() && (
-                  <p className="mt-1 text-xs text-(--danger)">实例名称不能为空</p>
-                )}
-              </div>
-              <div>
-                <label className={labelCls}>实例内核{form.id ? "" : "（必选）"}</label>
-                <select
-                  className={inputCls}
-                  value={form.browserId}
-                  disabled={!browsersLoaded || editingRunning}
-                  onChange={(e) => setForm({ ...form, browserId: e.target.value })}
-                >
-                  <option value="">{form.id ? "不选择内核" : "请选择内核"}</option>
-                  {browsers.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {kernelLabels.get(b.id) ?? b.name}
-                    </option>
-                  ))}
-                </select>
-                {browsersError ? (
-                  <p className="mt-1 text-xs text-(--danger)">内核列表加载失败：{browsersError}</p>
-                ) : !browsersLoaded ? (
-                  <p className="mt-1 text-xs text-(--text-faint)">内核列表加载中…</p>
-                ) : browsers.length === 0 ? (
-                  <p className="mt-1 text-xs text-(--text-faint)">
-                    尚未登记任何浏览器内核。
-                    <button
-                      type="button"
-                      className="text-(--accent) underline underline-offset-2"
-                      onClick={() => {
-                        setForm(null);
-                        setEditing(null);
-                        setPage("kernels");
-                      }}
-                    >
-                      前往「浏览器内核」页面添加
-                    </button>
-                  </p>
-                ) : null}
-                {editing && editing.kernelId !== "" && !browsers.some((b) => b.id === editing.kernelId) ? (
-                  <p className="mt-1 text-xs text-(--text-faint)">
-                    原关联的内核登记已不存在，当前按未关联处理；保存后将清除原关联。
-                  </p>
-                ) : editing && editing.kernelId === "" && (editing.kernelName || editing.kernelVersion) ? (
-                  <p className="mt-1 text-xs text-(--text-faint)">
-                    该实例保存有历史内核记录：{editing.kernelName}
-                    {editing.kernelVersion ? ` ${editing.kernelVersion}` : ""}
-                    （未关联登记内核）。不选择内核时此记录会保留；选择上方内核后将改为关联该登记。
-                  </p>
-                ) : null}
-              </div>
-              <div>
-                <label className={labelCls}>代理节点</label>
-                <ProxyNodePicker
-                  nodes={proxyNodes}
-                  value={form.proxyNodeId}
-                  onChange={(nodeId) => setForm({ ...form, proxyNodeId: nodeId })}
-                  ariaLabel="代理节点"
-                />
-                {editingRunning && form.id && (
-                  <p className="mt-1 text-xs text-(--text-faint)">
-                    {(() => {
-                      const current = proxyBindings.find((b) => b.instanceId === form.id)?.nodeId ?? "";
-                      if (form.proxyNodeId === current) return null;
-                      if (current && form.proxyNodeId) return "运行中更换节点立即生效（端口不变）。";
-                      if (!current && form.proxyNodeId) return "首次绑定在下次启动该实例时生效。";
-                      return "解绑在下次启动该实例时生效。";
-                    })()}
-                  </p>
-                )}
-                {proxyNodes.length === 0 && (
-                  <p className="mt-1 text-xs text-(--text-faint)">
-                    尚未导入任何代理节点。
-                    <button
-                      type="button"
-                      className="text-(--accent) underline underline-offset-2"
-                      onClick={() => {
-                        setForm(null);
-                        setEditing(null);
-                        setPage("proxyconfig");
-                      }}
-                    >
-                      前往「代理配置」页面添加
-                    </button>
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className={labelCls}>实例文件</label>
-                {!form.id ? (
-                  <div>
-                    <div className={modeGroupCls} role="group" aria-label="实例文件方式">
-                      <button
-                        type="button"
-                        aria-pressed={form.profileMode === "default"}
-                        className={modeButtonCls(form.profileMode === "default")}
-                        onClick={() => {
-                          setForm({ ...form, profileMode: "default", profileName: "" });
-                          setProfileNote(null);
-                        }}
-                      >
-                        默认
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={form.profileMode === "custom"}
-                        className={modeButtonCls(form.profileMode === "custom")}
-                        onClick={() => {
-                          setForm({ ...form, profileMode: "custom", profileName: "" });
-                          setProfileNote(null);
-                        }}
-                      >
-                        自定
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={form.profileMode === "existing"}
-                        className={modeButtonCls(form.profileMode === "existing")}
-                        onClick={() => {
-                          setForm({ ...form, profileMode: "existing", profileName: "" });
-                          setProfileNote(null);
-                        }}
-                      >
-                        选择
-                      </button>
-                    </div>
-                    {form.profileMode === "default" && (
-                      <p className="mt-2 text-xs text-(--text-faint)">
-                        自动分配实例文件：P-1、P-2、P-3……已分配过的编号不会重复使用。
-                      </p>
-                    )}
-                    {form.profileMode === "custom" && (
-                      <input
-                        className={`${inputCls} mt-2`}
-                        value={form.profileName}
-                        onChange={(e) => setForm({ ...form, profileName: e.target.value })}
-                        placeholder="实例文件名称，例如：工作账号"
-                      />
-                    )}
-                    {form.profileMode === "existing" && <div className="mt-2">{profilePickerBox(false)}</div>}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-xs text-(--text-faint)">
-                      当前实例文件：{editing ? profileFolderOf(editing) : ""}
-                      <span className="font-mono">（{editing?.userDataDir}）</span>
-                    </p>
-                    <div className={`${modeGroupCls} mt-2`} role="group" aria-label="实例文件方式">
-                      <button
-                        type="button"
-                        aria-pressed={form.profileMode === "rename"}
-                        disabled={editingActive}
-                        className={modeButtonCls(form.profileMode === "rename")}
-                        onClick={() => {
-                          setForm({
-                            ...form,
-                            profileMode: "rename",
-                            profileName: editing ? profileFolderOf(editing) : "",
-                          });
-                          setProfileNote(null);
-                        }}
-                      >
-                        自定
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={form.profileMode === "swap"}
-                        disabled={editingActive}
-                        className={modeButtonCls(form.profileMode === "swap")}
-                        onClick={() => {
-                          setForm({ ...form, profileMode: "swap", profileName: "" });
-                          setProfileNote(null);
-                        }}
-                      >
-                        选择
-                      </button>
-                    </div>
-                    {form.profileMode === "rename" && (
-                      <input
-                        className={`${inputCls} mt-2`}
-                        value={form.profileName}
-                        disabled={editingActive}
-                        onChange={(e) => setForm({ ...form, profileName: e.target.value })}
-                        placeholder="新的实例文件名称"
-                      />
-                    )}
-                    {form.profileMode === "swap" && (
-                      <div className="mt-2">{profilePickerBox(editingActive)}</div>
-                    )}
-                    {editingActive && (
-                      <p className="mt-2 text-xs text-(--text-faint)">
-                        {editingUnknown
-                          ? "实例运行状态无法确认时，不能更换实例文件；实例名称与内核可以修改。"
-                          : "实例运行中，不能更换内核或实例文件。"}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-              {formError && <p className="text-sm text-(--danger)">{formError}</p>}
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setForm(null);
-                  setEditing(null);
-                }}
-                className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--text-dim) hover:bg-(--hover-bg)"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void submitForm()}
-                className="rounded-md bg-(--accent) px-3 py-1.5 text-sm font-medium text-(--accent-contrast) hover:opacity-90 disabled:opacity-50"
-              >
-                保存
-              </button>
-            </div>
-      </Dialog>
+            setPage(page);
+          }}
+          onClose={() => {
+            if (!busy) {
+              setFormOpen(false);
+              setEditing(null);
+            }
+          }}
+          onCancel={() => {
+            setFormOpen(false);
+            setEditing(null);
+          }}
+          onSubmit={handleFormSubmit}
+        />
       )}
 
-      {profilePicker && form && (
+      {profilePicker && formOpen && (
         <ProfilePickerDialog
           picker={profilePicker}
           onPick={(name) => setProfilePicker({ ...profilePicker, picked: name })}
