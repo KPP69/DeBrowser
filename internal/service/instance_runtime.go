@@ -536,6 +536,11 @@ func (s *InstanceService) StartInstance(operationID string, id string) error {
 func (s *InstanceService) startInstance(id string, op *logging.Operation) error {
 	c, cancel := ctx()
 	defer cancel()
+	// Serialize with bookmark file access and profile deletion: the
+	// profile must not be read/written externally between the state
+	// check below and the moment the browser owns it.
+	unlock := s.lockInstanceFiles(id)
+	defer unlock()
 	inst, err := s.store.GetInstance(c, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
