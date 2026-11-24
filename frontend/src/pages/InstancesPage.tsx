@@ -1,31 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { TriangleAlert } from "lucide-react";
 import {
-  Layers,
-  Plus,
-  TriangleAlert,
-} from "lucide-react";
-import {
-  BrowserService,
   InstanceService,
   ProxyService,
-  type BindingView,
-  type BrowserView,
-  type NodeView,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import type { Instance } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { useAppStore } from "../stores/useAppStore";
-import { usePageRefresh } from "../hooks/usePageRefresh";
-import { notify, notifyError, notifySuccess } from "../stores/useNotificationStore";
-import { classifyCounts } from "../lib/operationResult";
-import type { NotificationItem } from "../lib/notifications";
+import { useInstancesData } from "../hooks/useInstancesData";
+import { useProfilePicker } from "../hooks/useProfilePicker";
+import { notifyError, notifySuccess } from "../stores/useNotificationStore";
+import { notifyBatchResult } from "../lib/batchNotifications";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import {
-  kernelOptionLabels,
+  BATCH_OP_ACTION,
+  BATCH_VERB,
   planBatch,
   planBatchCreate,
   profileFolderOf,
   pruneSelection,
-  sortInstancesByName,
   MAX_BATCH_CREATE,
   type BatchAction,
   type BatchPlanItem,
@@ -33,44 +25,11 @@ import {
 import DeleteDialogs from "../components/instances/DeleteDialogs";
 import BatchCreateDialog, { type BatchCreateState } from "../components/instances/BatchCreateDialog";
 import InstanceTable from "../components/instances/InstanceTable";
-import ProfilePickerDialog, { type ProfilePickerState } from "../components/instances/ProfilePickerDialog";
+import InstancesToolbar from "../components/instances/InstancesToolbar";
+import ProfilePickerDialog from "../components/instances/ProfilePickerDialog";
 import InstanceFormDialog, { EMPTY_FORM, type FormState } from "../components/instances/InstanceFormDialog";
 
 type PendingDelete = { instance: Instance; withProfile: boolean } | null;
-
-// The outcome of one batch operation goes to the global
-// notification system as ONE summary notification; the
-// per-item results (succeeded / skipped with reason / failed
-// with reason) ride along as expandable items in the
-// notification center. Partial success is reported as partial.
-function notifyBatchResult(
-  title: string,
-  okNames: string[],
-  skipped: { name: string; reason: string }[],
-  failed: { name: string; reason: string }[],
-): void {
-  const items: NotificationItem[] = [
-    ...okNames.map((name) => ({ name, status: "success" as const })),
-    ...skipped.map((it) => ({ name: it.name, status: "skipped" as const, reason: it.reason })),
-    ...failed.map((it) => ({ name: it.name, status: "failed" as const, reason: it.reason })),
-  ];
-  const summary =
-    `${title}：成功 ${okNames.length} 个` +
-    (skipped.length > 0 ? `，跳过 ${skipped.length} 个` : "") +
-    (failed.length > 0 ? `，失败 ${failed.length} 个` : "");
-  const kind = classifyCounts(okNames.length, failed.length, skipped.length);
-  if (kind !== null) notify(kind, summary, { items, important: true });
-}
-
-// The instance-file picker dialog: the options are fetched fresh
-// at open time (never the form-open cache), exactly one may be
-// picked, and nothing is applied until 「选择」 confirms.
-const BATCH_VERB: Record<BatchAction, string> = { start: "启动", stop: "关闭", delete: "删除" };
-const BATCH_OP_ACTION: Record<BatchAction, string> = {
-  start: "instance.start",
-  stop: "instance.stop",
-  delete: "instance.delete",
-};
 
 /**
  * 浏览器实例管理（Stage 9B）：实例的新建、编辑、删除与真实运行。
@@ -85,18 +44,24 @@ const BATCH_OP_ACTION: Record<BatchAction, string> = {
  */
 export default function InstancesPage() {
   const setPage = useAppStore((state) => state.setPage);
-  const [instances, setInstances] = useState<Instance[]>([]);
-  const [instancesError, setInstancesError] = useState<string | null>(null);
-  const [browsers, setBrowsers] = useState<BrowserView[]>([]);
-  // browsersLoaded is true only after ListBrowsers has succeeded.
-  // While it is false (still loading, or the load failed), saving
-  // is disabled: judging an association against a not-yet-loaded
-  // list would mistake it for a missing registration, and saving
-  // would then clear the association in the database.
-  const [browsersLoaded, setBrowsersLoaded] = useState(false);
-  const [browsersError, setBrowsersError] = useState<string | null>(null);
+  const {
+    instances,
+    instancesError,
+    displayInstances,
+    browsers,
+    kernelLabels,
+    browsersLoaded,
+    browsersError,
+    proxyNodes,
+    proxyBindings,
+    loading,
+    pollPaused,
+    load,
+    refresh,
+    refreshInstances,
+    resumePolling,
+  } = useInstancesData();
   const [editing, setEditing] = useState<Instance | null>(null);
-  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [formInitial, setFormInitial] = useState<FormState>(EMPTY_FORM);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
@@ -104,136 +69,23 @@ export default function InstancesPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   // Batch management state.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // 列表请求序号：轮询与操作后刷新并发时，只接受最后发出的响应。
-  const listSeq = useRef(0);
-  const pollFails = useRef(0);
-  // 轮询返回与上次相同的数据时跳过 setState，避免整张表每 2.5 秒
-  // 无意义重渲染一次。
-  const lastListJSON = useRef("");
-  const lastBindingsJSON = useRef("");
-  const [pollPaused, setPollPaused] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ verb: string; done: number; total: number; current: string } | null>(null);
   const [batchDeletePlan, setBatchDeletePlan] = useState<BatchPlanItem[] | null>(null);
   const [batchCreate, setBatchCreate] = useState<BatchCreateState | null>(null);
   const [batchCreateError, setBatchCreateError] = useState<string | null>(null);
   const [batchCreateBusy, setBatchCreateBusy] = useState(false);
-  // Proxy binding display + form data (from the proxy module's
-  // single binding relation; see FormState.proxyNodeId).
-  const [proxyNodes, setProxyNodes] = useState<NodeView[]>([]);
-  const [proxyBindings, setProxyBindings] = useState<BindingView[]>([]);
-  // Instance-file picker state (inside the create/edit form).
-  const [profilePicker, setProfilePicker] = useState<ProfilePickerState | null>(null);
-  const [pickerBusy, setPickerBusy] = useState(false);
-  const [profileNote, setProfileNote] = useState<string | null>(null);
-  const [appliedProfileName, setAppliedProfileName] = useState<string | null>(null);
-
-  // The list is displayed in natural name order; selection and
-  // select-all always refer to exactly this displayed list.
-  const displayInstances = useMemo(() => sortInstancesByName(instances), [instances]);
-  const kernelLabels = useMemo(() => kernelOptionLabels(browsers), [browsers]);
-
-  const refreshInstances = useCallback(async () => {
-    const seq = ++listSeq.current;
-    try {
-      const list = await InstanceService.ListInstances();
-      if (seq !== listSeq.current) return;
-      const nextJSON = JSON.stringify(list ?? []);
-      if (nextJSON !== lastListJSON.current) {
-        lastListJSON.current = nextJSON;
-        setInstances(list ?? []);
-      }
-      pollFails.current = 0;
-      setPollPaused(false);
-    } catch {
-      // A failed background refresh keeps the last known list;
-      // after three consecutive failures polling pauses, so a
-      // dead connection does not keep firing silent errors.
-      pollFails.current += 1;
-      if (pollFails.current >= 3) setPollPaused(true);
-    }
-    // Bindings changed on the proxy page show up here too:
-    // both pages read the same relation.
-    try {
-      const bds = await ProxyService.ListBindings();
-      if (seq !== listSeq.current) return;
-      const bindingsJSON = JSON.stringify(bds ?? []);
-      if (bindingsJSON !== lastBindingsJSON.current) {
-        lastBindingsJSON.current = bindingsJSON;
-        setProxyBindings(bds ?? []);
-      }
-    } catch {
-      // Keep the last known bindings on failure.
-    }
-  }, []);
-
-  const loadAll = useCallback(async (initial: boolean) => {
-    // Close the editing gate FIRST, before any await: on a reload,
-    // a stale browsersLoaded=true from the previous load must not
-    // keep editing enabled while the fresh lists are in flight.
-    // Only a successful ListBrowsers below re-opens it.
-    if (initial) {
-      setBrowsersLoaded(false);
-      setLoading(true);
-    }
-    const seq = ++listSeq.current;
-    try {
-      const list = await InstanceService.ListInstances();
-      if (seq !== listSeq.current) return;
-      setInstances(list ?? []);
-      setInstancesError(null);
-    } catch (err) {
-      // 读取失败与真实空列表严格区分：保留失败原因供页面
-      // 显示加载失败状态（不伪装成暂无实例），同时发一条
-      // 通知台错误。已有列表时不清空。
-      const message = err instanceof Error ? err.message : String(err);
-      setInstancesError(message);
-      notifyError(`加载实例列表失败：${message}`);
-    } finally {
-      if (initial) setLoading(false);
-    }
-    try {
-      const regs = await BrowserService.ListBrowsers();
-      setBrowsers(regs ?? []);
-      setBrowsersError(null);
-      setBrowsersLoaded(true);
-    } catch (err) {
-      // A failed load is NOT "no registrations": browsersLoaded
-      // stays false, editing stays disabled, and nothing about
-      // existing associations is inferred or touched.
-      setBrowsersError(err instanceof Error ? err.message : String(err));
-    }
-    // Proxy nodes + bindings for the table column and the form
-    // selector. A failure here only empties the proxy display;
-    // it never touches instance or kernel data.
-    try {
-      const [nds, bds] = await Promise.all([ProxyService.ListNodes(), ProxyService.ListBindings()]);
-      setProxyNodes(nds ?? []);
-      setProxyBindings(bds ?? []);
-    } catch {
-      // Keep the last known proxy data.
-    }
-  }, []);
-
-  const load = useCallback(() => loadAll(true), [loadAll]);
-  const refresh = useCallback(() => loadAll(false), [loadAll]);
-  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
-  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
-  const appPage = useAppStore((state) => state.page);
-  usePageRefresh("instances", refresh);
-
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Keep run states fresh while the page is open (a browser the
-  // user closed directly must flip to 已关闭 without a reload).
-  useEffect(() => {
-    if (pollPaused || appPage !== "instances") return;
-    const timer = setInterval(() => void refreshInstances(), 2500);
-    return () => clearInterval(timer);
-  }, [refreshInstances, pollPaused, appPage]);
+  const {
+    profilePicker,
+    setProfilePicker,
+    pickerBusy,
+    profileNote,
+    setProfileNote,
+    appliedProfileName,
+    setAppliedProfileName,
+    openProfilePicker,
+    confirmProfilePicker,
+  } = useProfilePicker(formOpen);
 
   // Selection never outlives the displayed list: ids that vanish
   // (deleted instances, reloads) are dropped from the selection.
@@ -525,127 +377,22 @@ export default function InstancesPage() {
     }
   };
 
-  // --- Instance-file picker -------------------------------------------------
-  // The picker list is fetched fresh on every open attempt: if no
-  // unbound instance file exists right now, the dialog does not
-  // open at all and the form keeps its current value.
-
-  const openProfilePicker = async (currentProfileName: string) => {
-    if (!formOpen) return;
-    setProfileNote(null);
-    setPickerBusy(true);
-    try {
-      const list = await InstanceService.ListAvailableProfiles();
-      const options = list ?? [];
-      if (options.length === 0) {
-        setProfileNote("目前没有未绑定的实例文件。");
-        return;
-      }
-      setProfilePicker({
-        options,
-        picked: options.some((o) => o.name === currentProfileName) ? currentProfileName : "",
-      });
-    } catch (err) {
-      setProfileNote(`获取实例文件列表失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPickerBusy(false);
-    }
-  };
-
-  const confirmProfilePicker = () => {
-    if (!profilePicker || !profilePicker.picked) return;
-    setAppliedProfileName(profilePicker.picked);
-    setProfilePicker(null);
-  };
-
   const allSelected =
     displayInstances.length > 0 && displayInstances.every((i) => selectedIds.has(i.id));
 
   return (
     <div className="mx-auto flex h-full max-w-5xl flex-col px-6 py-6">
-      {/* 顶部功能栏：常驻显示，按功能组整体换行。创建组
-          （新建实例 / 批量创建）与批量操作组（批量启动 / 批量
-          关闭 / 批量删除 / 取消选择）各自保持单行不拆分；宽度
-          不足时批量操作组整体换到下一行。批量按钮只在存在
-          选择时可用，不再使用勾选后弹出的批量操作栏，也不再
-          单独显示选择计数。 */}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex shrink-0 flex-nowrap items-center gap-2">
-          <button
-            type="button"
-            onClick={openCreate}
-            disabled={batchBusy}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-(--accent) px-3 text-sm font-medium text-(--accent-contrast) hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Plus size={14} /> 新建实例
-          </button>
-          <button
-            type="button"
-            onClick={openBatchCreate}
-            disabled={batchBusy}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Layers size={14} /> 批量创建
-          </button>
-        </div>
-        <div className="flex shrink-0 flex-nowrap items-center gap-2">
-          <button
-            type="button"
-            disabled={batchBusy || selectedIds.size === 0}
-            onClick={() => runBatch("start")}
-            className="flex h-9 shrink-0 items-center rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            批量启动
-          </button>
-          <button
-            type="button"
-            disabled={batchBusy || selectedIds.size === 0}
-            onClick={() => runBatch("stop")}
-            className="flex h-9 shrink-0 items-center rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            批量关闭
-          </button>
-          <button
-            type="button"
-            disabled={batchBusy || selectedIds.size === 0}
-            onClick={() => runBatch("delete")}
-            className="flex h-9 shrink-0 items-center rounded-md border border-(--border-strong) px-3 text-sm text-(--danger) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            批量删除
-          </button>
-          <button
-            type="button"
-            disabled={batchBusy || selectedIds.size === 0}
-            onClick={() => setSelectedIds(new Set())}
-            className="flex h-9 shrink-0 items-center rounded-md border border-(--border-strong) px-3 text-sm text-(--text-main) hover:bg-(--hover-bg) disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            取消选择
-          </button>
-        </div>
-      </div>
-
-      {batchProgress && (
-        <p className="mt-3 shrink-0 text-xs text-(--text-dim)" role="status">
-          正在批量{batchProgress.verb}：{batchProgress.done}/{batchProgress.total} · 当前 {batchProgress.current}
-        </p>
-      )}
-
-      {pollPaused && (
-        <p className="mt-3 shrink-0 text-xs text-(--warn)" role="status">
-          自动刷新已暂停
-          <button
-            type="button"
-            className="ml-2 underline underline-offset-2"
-            onClick={() => {
-              pollFails.current = 0;
-              setPollPaused(false);
-              void refreshInstances();
-            }}
-          >
-            重试
-          </button>
-        </p>
-      )}
+      <InstancesToolbar
+        batchBusy={batchBusy}
+        hasSelection={selectedIds.size > 0}
+        batchProgress={batchProgress}
+        pollPaused={pollPaused}
+        onCreate={openCreate}
+        onOpenBatchCreate={openBatchCreate}
+        onRunBatch={runBatch}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onRetryPoll={resumePolling}
+      />
 
       {browsersError && (
         <div className="mt-4 flex shrink-0 items-start gap-2 rounded-lg border border-(--danger-border) bg-(--danger-bg) px-3 py-2 text-sm text-(--danger)">
