@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Events } from "@wailsio/runtime";
 import { AppService } from "../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { AppStatus } from "../bindings/events";
@@ -21,6 +21,23 @@ export default function App() {
   const page = useAppStore((state) => state.page);
   const setStatus = useAppStore((state) => state.setStatus);
   const setTheme = useAppStore((state) => state.setTheme);
+
+  // 已访问页面保持挂载：切走再切回时筛选、勾选与内部滚动都还在。
+  // 每个页面仍占满主区域，隐藏的页面用 display:none 保留状态。
+  const mainRef = useRef<HTMLElement | null>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
+  const [visited, setVisited] = useState<Set<string>>(() => new Set([page]));
+  useEffect(() => {
+    setVisited((prev) => (prev.has(page) ? prev : new Set(prev).add(page)));
+  }, [page]);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    el.scrollTop = scrollPositions.current[page] ?? 0;
+    return () => {
+      scrollPositions.current[page] = el.scrollTop;
+    };
+  }, [page]);
 
   // 加载一次后端状态（供系统设置与数据管理页面显示）。
   // 只在挂载时调用一次；读取失败通过全局通知显示真实原因，
@@ -71,22 +88,30 @@ export default function App() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <main className="min-h-0 flex-1 overflow-y-auto bg-(--app-bg)">
-          {page === "settings" ? (
-            <SettingsPage />
-          ) : page === "instances" ? (
-            <InstancesPage />
-          ) : page === "kernels" ? (
-            <KernelsPage />
-          ) : page === "proxyconfig" ? (
-            <ProxyConfigPage />
-          ) : page === "datamanagement" ? (
-            <DataManagementPage />
-          ) : page === "bookmarks" ? (
-            <BookmarksPage />
-          ) : (
-            <SyncPage />
-          )}
+        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto bg-(--app-bg)">
+          {(
+            ["instances", "proxyconfig", "kernels", "bookmarks", "sync", "datamanagement", "settings"] as const
+          )
+            .filter((p) => visited.has(p))
+            .map((p) => (
+              <div key={p} className={p === page ? "h-full" : "hidden"}>
+                {p === "instances" ? (
+                  <InstancesPage />
+                ) : p === "proxyconfig" ? (
+                  <ProxyConfigPage />
+                ) : p === "kernels" ? (
+                  <KernelsPage />
+                ) : p === "bookmarks" ? (
+                  <BookmarksPage />
+                ) : p === "sync" ? (
+                  <SyncPage />
+                ) : p === "datamanagement" ? (
+                  <DataManagementPage />
+                ) : (
+                  <SettingsPage />
+                )}
+              </div>
+            ))}
         </main>
       </div>
       <NotificationToasts />
