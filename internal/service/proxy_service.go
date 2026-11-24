@@ -24,6 +24,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -57,6 +58,11 @@ const (
 	proxyMaxFetchedBytes = 16 << 20
 	proxyMaxNodes        = 2000
 
+	// nodeConfigSecretPrefix marks a node definition that is stored
+	// encrypted at rest. Node definitions carry passwords, UUIDs and
+	// private keys; the database must not hold them in plain text.
+	nodeConfigSecretPrefix = "dpapi:v1:"
+
 	// Node connectivity test: one fixed public target, one
 	// fixed timeout, a small fixed parallelism. No settings —
 	// the test answers "can this node connect right now".
@@ -73,6 +79,11 @@ type ProxyService struct {
 	layout paths.Layout
 	log    *slog.Logger
 	vault  *secrets.Store
+
+	// nodeProtector encrypts node definitions at rest (DPAPI on
+	// Windows). nil means no protector is available: definitions are
+	// then kept as before rather than failing the whole module.
+	nodeProtector secrets.Protector
 
 	// Auditor, when set, receives one operation-audit record
 	// per user-initiated mutation (Stage 5B pattern).
@@ -107,7 +118,72 @@ func NewProxyService(db *database.DB, layout paths.Layout, vault *secrets.Store,
 	s.delayNode = func(ctx context.Context, coreName string) (int, error) {
 		return s.client().Delay(ctx, coreName, nodeTestURL, nodeTestTimeoutMs)
 	}
+	if prot, err := secrets.NewProtector(filepath.Join(layout.Data, "node-config.key")); err != nil {
+		s.log.Warn("proxy: node definition protection unavailable", "error", err)
+	} else {
+		s.nodeProtector = prot
+		s.sealLegacyNodeConfigs(context.Background())
+	}
 	return s
+}
+
+// protectNodeConfig encrypts one node definition for storage.
+func (s *ProxyService) protectNodeConfig(plain []byte) (string, error) {
+	if s.nodeProtector == nil {
+		return string(plain), nil
+	}
+	blob, err := s.nodeProtector.Protect(plain)
+	if err != nil {
+		return "", fmt.Errorf("加密节点配置失败：%w", err)
+	}
+	return nodeConfigSecretPrefix + base64.StdEncoding.EncodeToString(blob), nil
+}
+
+// unprotectNodeConfig returns a node definition's plain JSON. A value
+// without the prefix is a legacy plaintext row and is returned as-is.
+func (s *ProxyService) unprotectNodeConfig(stored string) ([]byte, error) {
+	if !strings.HasPrefix(stored, nodeConfigSecretPrefix) {
+		return []byte(stored), nil
+	}
+	if s.nodeProtector == nil {
+		return nil, fmt.Errorf("节点配置已加密，但当前环境无法解密")
+	}
+	blob, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(stored, nodeConfigSecretPrefix))
+	if err != nil {
+		return nil, fmt.Errorf("节点配置密文损坏：%w", err)
+	}
+	plain, err := s.nodeProtector.Unprotect(blob)
+	if err != nil {
+		return nil, fmt.Errorf("节点配置无法解密（可能来自其他 Windows 用户或机器）")
+	}
+	return plain, nil
+}
+
+// sealLegacyNodeConfigs rewrites rows written before node definitions
+// were encrypted. A failure only leaves that row as it was; it never
+// blocks startup.
+func (s *ProxyService) sealLegacyNodeConfigs(ctx context.Context) {
+	if s.nodeProtector == nil {
+		return
+	}
+	nodes, err := s.store.ListProxyNodes(ctx)
+	if err != nil {
+		s.log.Warn("proxy: list nodes for sealing failed", "error", err)
+		return
+	}
+	for _, n := range nodes {
+		if strings.HasPrefix(n.ConfigJSON, nodeConfigSecretPrefix) {
+			continue
+		}
+		sealed, err := s.protectNodeConfig([]byte(n.ConfigJSON))
+		if err != nil {
+			s.log.Warn("proxy: seal node definition failed", "node", n.ID, "error", err)
+			continue
+		}
+		if err := s.store.UpdateProxyNodeConfig(ctx, n.ID, sealed); err != nil {
+			s.log.Warn("proxy: store sealed node definition failed", "node", n.ID, "error", err)
+		}
+	}
 }
 
 // ServiceShutdown stops the managed core when DeBrowser exits.
@@ -312,8 +388,12 @@ func (s *ProxyService) regenerateLocked(ctx context.Context) error {
 	}
 	defs := make([]mihomo.NodeDef, 0, len(nodes))
 	for _, n := range nodes {
+		plain, err := s.unprotectNodeConfig(n.ConfigJSON)
+		if err != nil {
+			return fmt.Errorf("节点「%s」的配置数据损坏：%w", n.Name, err)
+		}
 		var cfg map[string]any
-		if err := json.Unmarshal([]byte(n.ConfigJSON), &cfg); err != nil {
+		if err := json.Unmarshal(plain, &cfg); err != nil {
 			return fmt.Errorf("节点「%s」的配置数据损坏：%w", n.Name, err)
 		}
 		defs = append(defs, mihomo.NodeDef{CoreName: coreNodeName(n.ID), Config: cfg})
@@ -456,8 +536,12 @@ func (s *ProxyService) insertSourceLocked(ctx context.Context, src model.ProxySo
 			if err != nil {
 				return err
 			}
+			config, err := s.protectNodeConfig(cfgJSON)
+			if err != nil {
+				return err
+			}
 			if err := tx.CreateProxyNode(ctx, model.ProxyNode{
-				ID: id, SourceID: src.ID, Name: n.name, ConfigJSON: string(cfgJSON),
+				ID: id, SourceID: src.ID, Name: n.name, ConfigJSON: config,
 			}); err != nil {
 				return err
 			}
@@ -740,10 +824,16 @@ func (s *ProxyService) replaceNodesLocked(ctx context.Context, sourceID string, 
 			if err != nil {
 				return err
 			}
-			config := string(cfgJSON)
+			config, err := s.protectNodeConfig(cfgJSON)
+			if err != nil {
+				return err
+			}
 			if old, ok := byName[n.name]; ok {
 				kept[old.ID] = true
-				if old.ConfigJSON != config {
+				// Compare the plaintext definitions: the stored form
+				// is encrypted and differs on every seal.
+				oldPlain, derr := s.unprotectNodeConfig(old.ConfigJSON)
+				if derr != nil || string(oldPlain) != string(cfgJSON) {
 					if err := tx.UpdateProxyNodeConfig(ctx, old.ID, config); err != nil {
 						return err
 					}
@@ -857,7 +947,9 @@ func (s *ProxyService) ListNodes() ([]NodeView, error) {
 	out := make([]NodeView, 0, len(nodes))
 	for _, n := range nodes {
 		var cfg map[string]any
-		_ = json.Unmarshal([]byte(n.ConfigJSON), &cfg)
+		if plain, derr := s.unprotectNodeConfig(n.ConfigJSON); derr == nil {
+			_ = json.Unmarshal(plain, &cfg)
+		}
 		typ, _ := cfg["type"].(string)
 		out = append(out, NodeView{
 			ID: n.ID, SourceID: n.SourceID, SourceName: names[n.SourceID],
