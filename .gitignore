@@ -17,6 +17,12 @@ frontend/node_modules/
 *.test
 *.out
 
+# Portable runtime data created beside the executable when running
+# from the repository root (WebView2 holds cookies and cache).
+webview2-data/
+config/
+kernels/
+
 # DeBrowser runtime data — never commit user data
 *.db
 *.db-shm
