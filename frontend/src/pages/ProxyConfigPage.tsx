@@ -407,7 +407,7 @@ export default function ProxyConfigPage() {
 
       {/* 添加弹窗 */}
       {addOpen && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">添加代理配置</h3>
             <div className="mt-4 inline-flex overflow-hidden rounded-md border border-(--border-strong)">
@@ -456,7 +456,7 @@ export default function ProxyConfigPage() {
 
       {/* 删除来源确认 */}
       {confirmDeleteSource && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">删除代理配置</h3>
             <p className="mt-3 text-sm leading-relaxed text-(--text-dim)">
