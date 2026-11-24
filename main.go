@@ -47,6 +47,10 @@ func init() {
 
 func main() {
 	if err := run(); err != nil {
+		// The release build has no console (-H windowsgui), so a bare
+		// stderr write would be invisible to the user. Surface the
+		// failure in a native message box as well.
+		showStartupError(err)
 		fmt.Fprintf(os.Stderr, "debrowser: %v\n", err)
 		os.Exit(1)
 	}
