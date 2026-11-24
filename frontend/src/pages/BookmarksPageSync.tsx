@@ -8,6 +8,7 @@ import {
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import type { BookmarkNode } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
+import { DialogLayer } from "../components/Modal";
 import { notify, notifyError, notifyWarning } from "../stores/useNotificationStore";
 import { classifyApplyResult, classifySyncResult } from "../lib/operationResult";
 import type { NotificationItem } from "../lib/notifications";
@@ -55,7 +56,7 @@ export default function SyncDialog(props: {
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+    <DialogLayer open onClose={props.onClose}>
       <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">同步</h3>
@@ -91,7 +92,7 @@ export default function SyncDialog(props: {
           {tab === "delete" && <SearchTab mode="delete" busy={busy} run={run} />}
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }
 
