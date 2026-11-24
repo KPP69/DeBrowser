@@ -80,11 +80,13 @@ func NewSystem(cfg config.Config) (*System, error) {
 	}
 	// Global capacity: default until the app applies the user's
 	// persisted setting; writers nudge enforcement as they write.
+	// No enforcement runs here: the user's setting is applied by
+	// main once AppService has loaded it, so a short session must
+	// not trim logs against the 100 MB default first.
 	atomic.StoreInt64(&s.capacityLimit, DefaultCapacityBytes)
 	for _, w := range s.writers {
 		w.onThreshold = s.enforceThrottled
 	}
-	_ = s.EnforceCapacity()
 
 	level := ParseLevel(cfg.LogLevel)
 	opts := &slog.HandlerOptions{Level: level, ReplaceAttr: renameAttr}
