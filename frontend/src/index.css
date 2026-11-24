@@ -42,6 +42,7 @@
   --warn-bg: #faf0dc;
   --danger: #c44747;
   --danger-contrast: #ffffff;
+  --overlay: rgb(0 0 0 / 0.5);
   --danger-bg: #f9e8e8;
   --danger-border: #e5b5b5;
   --scrollbar: #c9ceda;
@@ -69,6 +70,7 @@
   --warn-bg: #f3e8d2;
   --danger: #b65f55;
   --danger-contrast: #ffffff;
+  --overlay: rgb(0 0 0 / 0.5);
   --danger-bg: #f6e3de;
   --danger-border: #dca79c;
   --scrollbar: #cdbfa6;
@@ -96,6 +98,7 @@
   --warn-bg: #38301e;
   --danger: #e27b7b;
   --danger-contrast: #2a1214;
+  --overlay: rgb(0 0 0 / 0.5);
   --danger-bg: #3a2426;
   --danger-border: #6e3a3c;
   --scrollbar: #39424f;
