@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog, Dialog, DialogLayer } from "../components/Modal";
 import {
   AppWindow,
@@ -169,6 +169,10 @@ export default function InstancesPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   // Batch management state.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // 列表请求序号：轮询与操作后刷新并发时，只接受最后发出的响应。
+  const listSeq = useRef(0);
+  const pollFails = useRef(0);
+  const [pollPaused, setPollPaused] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ verb: string; done: number; total: number; current: string } | null>(null);
   const [batchDeletePlan, setBatchDeletePlan] = useState<BatchPlanItem[] | null>(null);
@@ -190,17 +194,25 @@ export default function InstancesPage() {
   const kernelLabels = useMemo(() => kernelOptionLabels(browsers), [browsers]);
 
   const refreshInstances = useCallback(async () => {
+    const seq = ++listSeq.current;
     try {
       const list = await InstanceService.ListInstances();
+      if (seq !== listSeq.current) return;
       setInstances(list ?? []);
+      pollFails.current = 0;
+      setPollPaused(false);
     } catch {
       // A failed background refresh keeps the last known list;
-      // the next poll or action retries.
+      // after three consecutive failures polling pauses, so a
+      // dead connection does not keep firing silent errors.
+      pollFails.current += 1;
+      if (pollFails.current >= 3) setPollPaused(true);
     }
     // Bindings changed on the proxy page show up here too:
     // both pages read the same relation.
     try {
       const bds = await ProxyService.ListBindings();
+      if (seq !== listSeq.current) return;
       setProxyBindings(bds ?? []);
     } catch {
       // Keep the last known bindings on failure.
@@ -216,8 +228,10 @@ export default function InstancesPage() {
       setBrowsersLoaded(false);
       setLoading(true);
     }
+    const seq = ++listSeq.current;
     try {
       const list = await InstanceService.ListInstances();
+      if (seq !== listSeq.current) return;
       setInstances(list ?? []);
       setInstancesError(null);
     } catch (err) {
@@ -263,9 +277,10 @@ export default function InstancesPage() {
   // Keep run states fresh while the page is open (a browser the
   // user closed directly must flip to 已关闭 without a reload).
   useEffect(() => {
+    if (pollPaused) return;
     const timer = setInterval(() => void refreshInstances(), 2500);
     return () => clearInterval(timer);
-  }, [refreshInstances]);
+  }, [refreshInstances, pollPaused]);
 
   // Selection never outlives the displayed list: ids that vanish
   // (deleted instances, reloads) are dropped from the selection.
@@ -721,6 +736,23 @@ export default function InstancesPage() {
         </p>
       )}
 
+      {pollPaused && (
+        <p className="mt-3 shrink-0 text-xs text-(--warn)" role="status">
+          自动刷新已暂停
+          <button
+            type="button"
+            className="ml-2 underline underline-offset-2"
+            onClick={() => {
+              pollFails.current = 0;
+              setPollPaused(false);
+              void refreshInstances();
+            }}
+          >
+            重试
+          </button>
+        </p>
+      )}
+
       {browsersError && (
         <div className="mt-4 flex shrink-0 items-start gap-2 rounded-lg border border-(--danger-border) bg-(--danger-bg) px-3 py-2 text-sm text-(--danger)">
           <TriangleAlert size={16} className="mt-0.5 shrink-0" />
@@ -958,10 +990,20 @@ export default function InstancesPage() {
                 <ProxyNodePicker
                   nodes={proxyNodes}
                   value={form.proxyNodeId}
-                  disabled={editingRunning}
                   onChange={(nodeId) => setForm({ ...form, proxyNodeId: nodeId })}
                   ariaLabel="代理节点"
                 />
+                {editingRunning && form.id && (
+                  <p className="mt-1 text-xs text-(--text-faint)">
+                    {(() => {
+                      const current = proxyBindings.find((b) => b.instanceId === form.id)?.nodeId ?? "";
+                      if (form.proxyNodeId === current) return null;
+                      if (current && form.proxyNodeId) return "运行中更换节点立即生效（端口不变）。";
+                      if (!current && form.proxyNodeId) return "首次绑定在下次启动该实例时生效。";
+                      return "解绑在下次启动该实例时生效。";
+                    })()}
+                  </p>
+                )}
                 {proxyNodes.length === 0 && (
                   <p className="mt-1 text-xs text-(--text-faint)">
                     尚未导入任何代理节点。
