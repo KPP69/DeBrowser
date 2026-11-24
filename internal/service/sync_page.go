@@ -11,6 +11,11 @@ import (
 	"github.com/KPP69/DeBrowser/internal/cdp"
 )
 
+// syncWorldName is the isolated world the observer script runs in.
+// The report binding is registered for that world only, so a page's
+// own scripts (the main world) can never call it to forge events.
+const syncWorldName = "debrowser-sync"
+
 // pageTracker attaches to the page targets of ONE browser
 // connection (the master's or a follower's), installs the
 // observer script on the master side, and tracks which targets
@@ -235,11 +240,13 @@ func (t *pageTracker) attach(ctx context.Context, targetID string) (err error) {
 		return err
 	}
 	if t.master {
-		if _, err := t.client.Call(ctx, sid, "Runtime.addBinding", map[string]any{"name": capture.BindingName}); err != nil {
+		if _, err := t.client.Call(ctx, sid, "Runtime.addBinding", map[string]any{
+			"name": capture.BindingName, "executionContextName": syncWorldName,
+		}); err != nil {
 			return err
 		}
 		if _, err := t.client.Call(ctx, sid, "Page.addScriptToEvaluateOnNewDocument", map[string]any{
-			"source": capture.Script, "worldName": "debrowser-sync",
+			"source": capture.Script, "worldName": syncWorldName,
 		}); err != nil {
 			return err
 		}
@@ -330,7 +337,7 @@ func (t *pageTracker) onContextCreated(ev cdp.Event) {
 	if err := json.Unmarshal(ev.Params, &p); err != nil {
 		return
 	}
-	if p.Context.Name != "debrowser-sync" || !p.Context.AuxData.IsMain {
+	if p.Context.Name != syncWorldName || !p.Context.AuxData.IsMain {
 		return // only the top frame's isolated world is bound
 	}
 	t.mu.Lock()
@@ -393,8 +400,9 @@ func (t *pageTracker) onFrameNavigated(ev cdp.Event) {
 
 func (t *pageTracker) onBindingCalled(ev cdp.Event) {
 	var p struct {
-		Name    string `json:"name"`
-		Payload string `json:"payload"`
+		Name               string `json:"name"`
+		Payload            string `json:"payload"`
+		ExecutionContextID int    `json:"executionContextId"`
 	}
 	if err := json.Unmarshal(ev.Params, &p); err != nil || p.Name != capture.BindingName {
 		return
@@ -412,6 +420,13 @@ func (t *pageTracker) onBindingCalled(ev cdp.Event) {
 		}
 	}
 	if targetID == "" {
+		t.mu.Unlock()
+		return
+	}
+	// Defense in depth: the binding is registered for the isolated
+	// world only, and a report must come from that world's context.
+	// A call from the page's own main-world context is dropped.
+	if want, ok := t.contexts[targetID]; ok && want != 0 && p.ExecutionContextID != want {
 		t.mu.Unlock()
 		return
 	}
