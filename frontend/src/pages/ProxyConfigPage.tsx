@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ConfirmDialog } from "../components/Modal";
 import { Gauge, Loader2, Play, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
   InstanceService,
@@ -240,8 +241,6 @@ export default function ProxyConfigPage() {
     "inline-flex h-9 items-center gap-1.5 rounded-md border border-(--border-strong) bg-(--input-bg) px-3 text-sm text-(--text-main) transition hover:bg-(--hover-bg) disabled:opacity-50";
   const btnSmall =
     "inline-flex h-7 items-center gap-1 rounded-md border border-(--border-strong) bg-(--input-bg) px-2 text-xs text-(--text-main) transition hover:bg-(--hover-bg) disabled:opacity-50";
-  const btnDanger =
-    "inline-flex h-9 items-center gap-1.5 rounded-md bg-(--danger) px-3 text-sm font-medium text-(--danger-contrast) transition hover:opacity-90 disabled:opacity-50";
 
   return (
     <div className="flex h-full flex-col gap-4 p-5">
@@ -455,35 +454,24 @@ export default function ProxyConfigPage() {
       )}
 
       {/* 删除来源确认 */}
-      {confirmDeleteSource && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
-          <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
-            <h3 className="text-base font-semibold">删除代理配置</h3>
-            <p className="mt-3 text-sm leading-relaxed text-(--text-dim)">
-              确定删除「{confirmDeleteSource.name}」吗？其全部节点将被移除，正在使用这些节点的实例将变为未设置代理。此操作不可恢复。
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className={btnSecondary} disabled={busy !== null} onClick={() => setConfirmDeleteSource(null)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className={btnDanger}
-                disabled={busy !== null}
-                onClick={() => {
-                  const src = confirmDeleteSource;
-                  setConfirmDeleteSource(null);
-                  void run(`delete-${src.id}`, "proxy.source_delete", `代理配置「${src.name}」已删除`, async (opId) => {
-                    await ProxyService.DeleteSource(opId, src.id);
-                  });
-                }}
-              >
-                删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmDeleteSource !== null}
+        title={confirmDeleteSource ? `删除代理配置「${confirmDeleteSource.name}」` : "删除代理配置"}
+        impact="其全部节点将被移除，正在使用这些节点的实例将变为未设置代理。此操作不可恢复。"
+        count={1}
+        countLabel="个代理配置"
+        confirmLabel="删除"
+        busy={busy !== null}
+        onCancel={() => setConfirmDeleteSource(null)}
+        onConfirm={() => {
+          if (!confirmDeleteSource) return;
+          const src = confirmDeleteSource;
+          setConfirmDeleteSource(null);
+          void run(`delete-${src.id}`, "proxy.source_delete", `代理配置「${src.name}」已删除`, async (opId) => {
+            await ProxyService.DeleteSource(opId, src.id);
+          });
+        }}
+      />
     </div>
   );
 }
