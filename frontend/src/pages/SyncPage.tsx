@@ -79,7 +79,7 @@ export default function SyncPage() {
     }
   }, []);
 
-  // 显示器列表只在页面挂载时读取一次（不是轮询）；
+  // 显示器列表在挂载与切回本页时读取（不是轮询）；
   // 加载失败时通过全局通知显示真实原因，不静默吞掉，
   // 并保留失败原因供页面区分读取失败与真实空列表。
   const loadMonitors = useCallback(() => {
@@ -88,8 +88,13 @@ export default function SyncPage() {
         const list = ms ?? [];
         setMonitors(list);
         setMonitorsError(null);
-        const primary = list.find((m) => m.primary);
-        if (primary) setMonitorId(primary.id);
+        // 切回页面只刷新列表，不动用户已选的显示器：只有
+        // 当前选择不在新列表中时才回落到主显示器。首次加载
+        // 时 monitorId 为初始值 0，同样走该分支。
+        setMonitorId((cur) => {
+          if (list.some((m) => m.id === cur)) return cur;
+          return list.find((m) => m.primary)?.id ?? cur;
+        });
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
