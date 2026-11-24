@@ -11,6 +11,14 @@ export function useDialogBehavior(
   onClose: () => void,
   onSubmit?: () => void,
 ) {
+  // 回调放 ref：父组件每次输入都会生成新的内联函数，如果直接写进
+  // 依赖数组，effect 会在每个字符后重跑并重新聚焦首元素，输入框就会
+  // 在每敲一个字后丢焦点。
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const submitRef = useRef(onSubmit);
+  submitRef.current = onSubmit;
+
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -22,21 +30,25 @@ export function useDialogBehavior(
           'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
         ),
       );
-    const first = panel.querySelector<HTMLElement>("[data-autofocus]") ?? focusables()[0];
-    first?.focus();
+    // 只在焦点不在弹窗内时做初始聚焦，避免重渲染抢走输入焦点。
+    const active = document.activeElement as HTMLElement | null;
+    if (!active || !panel.contains(active)) {
+      const first = panel.querySelector<HTMLElement>("[data-autofocus]") ?? focusables()[0];
+      first?.focus();
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        closeRef.current();
         return;
       }
-      if (e.key === "Enter" && onSubmit) {
+      if (e.key === "Enter" && submitRef.current) {
         const target = e.target as HTMLElement | null;
         const tag = target?.tagName;
         if (tag !== "TEXTAREA" && tag !== "BUTTON" && tag !== "A") {
           e.preventDefault();
-          onSubmit();
+          submitRef.current();
         }
         return;
       }
@@ -58,7 +70,7 @@ export function useDialogBehavior(
       document.removeEventListener("keydown", onKey);
       previous?.focus?.();
     };
-  }, [open, containerRef, onClose, onSubmit]);
+  }, [open, containerRef]);
 }
 
 /**
