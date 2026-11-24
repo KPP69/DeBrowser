@@ -242,6 +242,22 @@ func (s *SyncService) watchdog(sess *syncSession) {
 					w.markFailed("实例已退出或身份无法确认")
 				}
 			})
+
+			// Window sizes can change while sync runs (user resize,
+			// arrangement, DPI change). Re-read both viewports so the
+			// coordinate scaling stays correct; refreshViewports is
+			// idempotent and runs off this goroutine.
+			if active := sess.activeTargetID(); active != "" {
+				go sess.refreshViewports(active)
+			}
 		}
 	}
+}
+
+// activeTargetID returns the master target that currently drives
+// input, or "" when none is active.
+func (sess *syncSession) activeTargetID() string {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	return sess.activeTarget
 }
