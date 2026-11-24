@@ -158,3 +158,103 @@ test("Enter in a dialog input calls onSubmit", () => {
     cleanup(root, container);
   }
 });
+
+// Regression test for audit H-4: every DialogLayer registered its own
+// Esc listener on document with only preventDefault, so one Esc closed
+// all stacked dialogs at once and the lower form lost unsaved input.
+// Only the topmost layer in the top-layer stack responds to Esc now.
+function NestedHarness({
+  onOuterClose,
+  onInnerClose,
+}: {
+  onOuterClose: () => void;
+  onInnerClose: () => void;
+}) {
+  const [innerOpen, setInnerOpen] = useState(false);
+  const [value, setValue] = useState("已输入");
+  return (
+    <Dialog open onClose={() => onOuterClose()}>
+      <label>
+        名称
+        <input value={value} onChange={(e) => setValue(e.target.value)} />
+      </label>
+      <button type="button" onClick={() => setInnerOpen(true)}>
+        选择
+      </button>
+      {innerOpen && (
+        <Dialog
+          open
+          onClose={() => {
+            onInnerClose();
+            setInnerOpen(false);
+          }}
+        >
+          <p>选择器弹窗</p>
+        </Dialog>
+      )}
+    </Dialog>
+  );
+}
+
+test("Esc with two stacked dialogs closes only the top one", () => {
+  let outerClosed = 0;
+  let innerClosed = 0;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => {
+    root.render(
+      <NestedHarness
+        onOuterClose={() => {
+          outerClosed += 1;
+        }}
+        onInnerClose={() => {
+          innerClosed += 1;
+        }}
+      />,
+    );
+  });
+  try {
+    const input = container.querySelector("input") as HTMLInputElement;
+    assert.equal(input.value, "已输入");
+    // Type into the outer form first, so the test can prove the input
+    // survives the Esc that closes the inner dialog.
+    typeText(input, "已输入改");
+    assert.equal(input.value, "已输入改");
+
+    // Open the inner dialog afterwards, as in real usage (the form
+    // opens first, the picker second): the inner dialog is pushed
+    // on top of the layer stack.
+    const pickButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "选择",
+    ) as HTMLButtonElement;
+    act(() => {
+      pickButton.click();
+    });
+    assert.ok(container.textContent?.includes("选择器弹窗"));
+
+    // One Esc: only the inner dialog closes; the outer form stays
+    // open with its input intact.
+    act(() => {
+      document.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    assert.equal(innerClosed, 1);
+    assert.equal(outerClosed, 0);
+    assert.ok(!container.textContent?.includes("选择器弹窗"));
+    const stillThere = container.querySelector("input") as HTMLInputElement;
+    assert.ok(stillThere, "outer form input must still be present");
+    assert.equal(stillThere.value, "已输入改");
+
+    // A second Esc now closes the outer dialog (it is topmost again).
+    act(() => {
+      document.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    assert.equal(outerClosed, 1);
+  } finally {
+    cleanup(root, container);
+  }
+});

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import type { NodeView } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
+import { useTopLayer } from "./Modal";
 
 // 代理节点选择器：代理配置页与浏览器实例页共用的同一个
 // 组件。菜单顶部是固定搜索框（按节点名不区分大小写部分
@@ -25,6 +26,9 @@ export default function ProxyNodePicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  // 菜单打开时注册为顶层栈的一层：Esc 先由菜单响应，
+  // 而不是直接关掉下层表单弹窗。
+  const isTopLayer = useTopLayer(open);
 
   const selected = nodes.find((n) => n.id === value);
   const filtered = useMemo(() => {
@@ -42,7 +46,13 @@ export default function ProxyNodePicker({
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      // 菜单不是栈顶时（上方另有弹窗）不处理，让栈顶层响应；
+      // 是栈顶时关闭菜单，并阻止事件继续冒泡到 document 上的
+      // dialog 监听器，避免一次 Esc 同时关掉下层表单。
+      if (!isTopLayer()) return;
+      e.stopImmediatePropagation();
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
