@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DialogLayer } from "../components/Modal";
 import {
   Bookmark,
   ChevronDown,
@@ -512,16 +513,15 @@ export default function BookmarksPage() {
       )}
 
       {syncGate !== "idle" && (
-        <div
-          className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4"
-          onClick={() => {
-            // 点击窗口外区域等同于取消（关闭处理中不允许取消）。
+        <DialogLayer
+          open
+          onClose={() => {
+            // 关闭处理中不允许取消。
             if (syncGate === "confirm") setSyncGate("idle");
           }}
         >
           <div
             className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold">同步前关闭实例</h3>
             {syncGate === "closing" ? (
@@ -552,7 +552,7 @@ export default function BookmarksPage() {
               </>
             )}
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       {syncOpen && (
@@ -664,7 +664,7 @@ function CreateDialog(props: {
   const [parentId, setParentId] = useState("");
   const isBookmark = props.tab === "bookmark";
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+    <DialogLayer open onClose={props.onClose}>
       <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">新建</h3>
@@ -730,7 +730,7 @@ function CreateDialog(props: {
           </button>
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }
 
@@ -746,7 +746,7 @@ function EditDialog(props: {
   const [parentId, setParentId] = useState(props.node.parentId ?? "");
   const isBookmark = props.node.kind === "bookmark";
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+    <DialogLayer open onClose={props.onClose}>
       <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <h3 className="text-base font-semibold">编辑{isBookmark ? "书签" : "文件夹"}</h3>
         <div className="mt-3 flex flex-col gap-3">
@@ -795,6 +795,6 @@ function EditDialog(props: {
           </button>
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }
