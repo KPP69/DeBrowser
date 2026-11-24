@@ -82,7 +82,7 @@ func run() error {
 	}
 
 	// The startup record deliberately carries no filesystem paths:
-	// log files leave the machine in diagnostic exports, and
+	// log files leave the machine in log exports, and
 	// absolute paths disclose the user's directory layout.
 	logger.Info("starting debrowser")
 
@@ -191,7 +191,7 @@ func run() error {
 	// be wired); flush those outcomes into the unified record now.
 	instanceService.ReportReconciliation()
 
-	diagnosticsService := service.NewDiagnosticsService(db, logSystem, appService)
+	dataService := service.NewDataService(db, logSystem, appService)
 	syncService := service.NewSyncService(instanceService)
 	syncService.Auditor = logSystem
 
@@ -203,7 +203,7 @@ func run() error {
 	proxyService.Auditor = logSystem
 	instanceService.ProxyPortFor = proxyService.ProxyPortForInstance
 
-	wailsApp := app.New(cfg, appService, instanceService, diagnosticsService, browserService, bookmarkService, syncService, proxyService, logger, assets)
+	wailsApp := app.New(cfg, appService, instanceService, dataService, browserService, bookmarkService, syncService, proxyService, logger, assets)
 	logSystem.RecordLifecycle("应用初始化完成", logging.StatusSuccess, nil)
 	runErr := wailsApp.Run()
 	if runErr != nil {
