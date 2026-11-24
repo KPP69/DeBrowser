@@ -132,3 +132,32 @@ func TestPurgeSwapIntermediateJunctionAfterVerifyRefusedOnWindows(t *testing.T) 
 	}
 	_ = os.Remove(filepath.Join(cfg.Layout.Profiles, "mid")) // junction link only
 }
+
+// A junction that stays INSIDE profiles still redirects the delete:
+// profiles/jlink -> profiles/jtarget. The old check only looked at
+// os.ModeSymlink, which a junction does not necessarily set, so the
+// purge used to follow the link and erase the sibling profile. The
+// delete must refuse and leave the sibling data untouched.
+func TestPurgeRefusesJunctionToSiblingProfileOnWindows(t *testing.T) {
+	svc, cfg := testInstanceService(t)
+	target := filepath.Join(cfg.Layout.Profiles, "jtarget")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(target, "keep.txt")
+	if err := os.WriteFile(sentinel, []byte("sibling profile"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	makeJunction(t, filepath.Join(cfg.Layout.Profiles, "jlink"), target)
+	in := seedInstance(t, cfg, "junction-sibling", "profiles/jlink")
+	err := svc.DeleteInstanceAndProfile("", in.ID)
+	if err == nil {
+		t.Fatal("purge of a junction to a sibling profile was allowed, want refusal")
+	}
+	if _, statErr := os.Stat(sentinel); statErr != nil {
+		t.Errorf("sibling profile data was deleted: %v", statErr)
+	}
+	if _, getErr := svc.GetInstance(in.ID); getErr != nil {
+		t.Errorf("metadata removed despite refusal: %v", getErr)
+	}
+}
