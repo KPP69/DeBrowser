@@ -64,7 +64,7 @@ type System struct {
 // NewSystem creates the three category writers under the layout's
 // logs directory and builds the application logger. Retention and
 // capacity enforcement run during creation; a cleanup failure is
-// recorded for diagnostics and never fails startup.
+// recorded for the data page and never fails startup.
 func NewSystem(cfg config.Config) (*System, error) {
 	dir := cfg.Layout.Logs
 	s := &System{dir: dir, writers: make(map[Category]*categoryWriter)}
@@ -150,7 +150,7 @@ func (s *System) Audit(e AuditEvent) {
 }
 
 // CategoryStats is a point-in-time view of one category for the
-// diagnostics page and exports.
+// data page and log export.
 type CategoryStats struct {
 	Category      Category
 	Files         int
@@ -181,7 +181,7 @@ func (s *System) Stats() []CategoryStats {
 	return out
 }
 
-// LogFile describes one log file for diagnostic export.
+// LogFile describes one log file for the log export.
 type LogFile struct {
 	Category Category
 	Name     string // base name
