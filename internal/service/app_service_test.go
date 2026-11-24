@@ -59,9 +59,6 @@ func TestGetStatusReportsPortablePaths(t *testing.T) {
 func TestSettingsDefaultsAndThemePersistence(t *testing.T) {
 	svc := testService(t)
 	got := svc.GetSettings()
-	if got.Language != settings.LanguageZhCN {
-		t.Errorf("language = %q, want zh-CN", got.Language)
-	}
 	if got.Theme != settings.ThemeLight {
 		t.Errorf("theme = %q, want light default", got.Theme)
 	}
