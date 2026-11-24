@@ -286,7 +286,10 @@ func (s *BookmarkService) applySearch(token string, groupKeys []string, mutate f
 }
 
 func (s *BookmarkService) applyToInstance(instanceID string, targets []bookmarkTarget, kind string, mutate func(node map[string]any, kind string) error, result *ApplySearchResult) {
-	_, dir, gate, err := s.instances.InstanceBookmarkAccess(instanceID)
+	unlock, _, dir, gate, err := s.instances.LockBookmarkAccess(instanceID)
+	if unlock != nil {
+		defer unlock()
+	}
 	if err != nil {
 		result.FailedInstances++
 		result.FailedNodes += len(targets)
@@ -304,8 +307,8 @@ func (s *BookmarkService) applyToInstance(instanceID string, targets []bookmarkT
 		result.FailedNodes += len(targets)
 		return
 	}
-	unlock := chromebookmarks.LockProfile(pdir)
-	defer unlock()
+	profileUnlock := chromebookmarks.LockProfile(pdir)
+	defer profileUnlock()
 	loaded, err := chromebookmarks.LoadOrEmpty(pdir)
 	if err != nil {
 		result.FailedInstances++
