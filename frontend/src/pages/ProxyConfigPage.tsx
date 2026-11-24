@@ -110,9 +110,10 @@ export default function ProxyConfigPage() {
   // 页面打开期间保持核心状态、绑定与实例列表新鲜（新建的
   // 实例自动出现，删除的实例自动消失）。
   useEffect(() => {
+    if (appPage !== "proxyconfig") return;
     const timer = setInterval(() => void reloadStatus(), 3000);
     return () => clearInterval(timer);
-  }, [reload]);
+  }, [reloadStatus, appPage]);
 
   const bindingByInstance = useMemo(() => {
     const map = new Map<string, BindingView>();
