@@ -50,7 +50,7 @@ type BrowserService struct {
 
 	// ExecutablePicker opens the native file picker for manual
 	// browser registration. It is injected by the app package (the
-	// service layer stays GUI-free, like the diagnostics save
+	// service layer stays GUI-free, like the log export save
 	// picker). Nil means manual adding is unavailable.
 	ExecutablePicker func() (string, error)
 }
