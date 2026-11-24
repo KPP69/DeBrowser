@@ -32,7 +32,7 @@ import {
   type VisibleRow,
 } from "./bookmarksLogic";
 import SyncDialog from "./BookmarksPageSync";
-import { useAppStore } from "../stores/useAppStore";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -181,15 +181,7 @@ export default function BookmarksPage() {
 
   // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
   // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
-  const appPage = useAppStore((state) => state.page);
-  const firstActivation = useRef(true);
-  useEffect(() => {
-    if (firstActivation.current) {
-      firstActivation.current = false;
-      return;
-    }
-    if (appPage === "bookmarks") void reload();
-  }, [appPage, reload]);
+  usePageRefresh("bookmarks", reload);
 
 
   useEffect(() => {

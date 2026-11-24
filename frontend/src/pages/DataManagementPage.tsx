@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DialogLayer } from "../components/Modal";
 import { Activity, Database, Timer } from "lucide-react";
 import {
@@ -8,6 +8,7 @@ import {
   type LogExportInfo,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { useAppStore } from "../stores/useAppStore";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 
@@ -89,15 +90,7 @@ export default function DataManagementPage() {
 
   // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
   // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
-  const appPage = useAppStore((state) => state.page);
-  const firstActivation = useRef(true);
-  useEffect(() => {
-    if (firstActivation.current) {
-      firstActivation.current = false;
-      return;
-    }
-    if (appPage === "datamanagement") void refresh();
-  }, [appPage, refresh]);
+  usePageRefresh("datamanagement", refresh);
 
 
   useEffect(() => {
