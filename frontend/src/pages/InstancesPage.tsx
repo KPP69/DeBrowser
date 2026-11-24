@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmDialog, Dialog, DialogLayer } from "../components/Modal";
+import { Dialog, DialogLayer } from "../components/Modal";
 import {
   AppWindow,
   ChevronDown,
@@ -39,6 +39,8 @@ import {
   type BatchAction,
   type BatchPlanItem,
 } from "./instancesLogic";
+import DeleteDialogs from "../components/instances/DeleteDialogs";
+import { inputCls, labelCls, modeButtonCls, modeGroupCls } from "../components/instances/formStyles";
 
 // Three statuses get a small colored dot plus matching text
 // color, using the shared theme tokens (gray / ok-green /
@@ -636,23 +638,11 @@ export default function InstancesPage() {
     setProfilePicker(null);
   };
 
-  const inputCls =
-    "w-full rounded-md border border-(--border) bg-(--input-bg) px-2.5 py-1.5 text-sm text-(--text-main) outline-none placeholder:text-(--text-faint) disabled:opacity-50";
-  const labelCls = "mb-1 block text-xs text-(--text-dim)";
-  const modeGroupCls = "inline-flex overflow-hidden rounded-md border border-(--border-strong)";
-  const modeButtonCls = (active: boolean) =>
-    `h-8 px-3.5 text-sm transition-colors ${
-      active
-        ? "bg-(--accent) font-medium text-(--accent-contrast)"
-        : "bg-(--input-bg) text-(--text-dim) hover:bg-(--hover-bg)"
-    } disabled:cursor-not-allowed disabled:opacity-50`;
   const editingActive = editing ? ACTIVE_STATUSES.has(editing.status) : false;
   const editingRunning = editing ? ["running", "starting", "stopping"].includes(editing.status) : false;
   const editingUnknown = editing?.status === "unknown";
   const allSelected =
     displayInstances.length > 0 && displayInstances.every((i) => selectedIds.has(i.id));
-  const batchDeleteRunnable = batchDeletePlan?.filter((p) => p.run) ?? [];
-  const batchDeleteSkipped = batchDeletePlan?.filter((p) => !p.run) ?? [];
 
   // The clickable box shown in the form's 选择 mode: it never
   // expands inline; it opens the picker dialog (or explains why
@@ -1206,65 +1196,21 @@ export default function InstancesPage() {
         </DialogLayer>
       )}
 
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title={pendingDelete ? `删除实例「${pendingDelete.instance.name}」` : "删除实例"}
-        impact={
-          pendingDelete?.withProfile
-            ? `将同时删除实例记录和实例文件 ${pendingDelete.instance.userDataDir} 中的全部浏览器数据（Cookie、登录状态、历史记录等），此操作不可恢复。`
-            : `仅删除实例记录，实例文件 ${pendingDelete?.instance.userDataDir ?? ""} 会保留在磁盘上，之后可以重新绑定到其他实例。`
-        }
-        count={1}
-        countLabel="个实例"
-        details={
-          pendingDelete && !pendingDelete.withProfile ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPendingDelete({ ...pendingDelete, withProfile: true })}
-              className="mt-3 text-sm text-(--danger) underline underline-offset-2"
-            >
-              改为同时删除实例文件
-            </button>
-          ) : undefined
-        }
-        confirmLabel={pendingDelete?.withProfile ? "确认删除实例及实例文件" : "确认仅删除实例"}
+      <DeleteDialogs
+        pendingDelete={pendingDelete}
+        onToggleWithProfile={() => {
+          if (pendingDelete) setPendingDelete({ ...pendingDelete, withProfile: true });
+        }}
+        onConfirmSingle={() => void confirmDelete()}
+        onCancelSingle={() => setPendingDelete(null)}
         busy={busy}
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setPendingDelete(null)}
-      />
-
-      <ConfirmDialog
-        open={batchDeletePlan !== null}
-        title="批量删除实例"
-        impact="仅删除实例记录；实例文件会保留在磁盘上，之后可以重新绑定到其他实例。"
-        count={batchDeleteRunnable.length}
-        countLabel="个实例"
-        details={
-          <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-(--border) px-3 py-2">
-            {batchDeleteRunnable.map((p) => (
-              <p key={p.id} className="py-0.5 text-sm text-(--text-main)">
-                {p.name}
-              </p>
-            ))}
-          </div>
-        }
-        note={
-          batchDeleteSkipped.length > 0
-            ? `另有 ${batchDeleteSkipped.length} 个所选实例不会删除：${batchDeleteSkipped
-                .map((p) => `「${p.name}」${p.reason}`)
-                .join("；")}。`
-            : undefined
-        }
-        confirmLabel={`确认删除 ${batchDeleteRunnable.length} 个实例`}
-        busy={batchBusy}
-        onConfirm={() => {
-          if (!batchDeletePlan) return;
-          const plan = batchDeletePlan;
+        batchDeletePlan={batchDeletePlan}
+        onConfirmBatch={(plan) => {
           setBatchDeletePlan(null);
           void executeBatch("delete", plan);
         }}
-        onCancel={() => setBatchDeletePlan(null)}
+        onCancelBatch={() => setBatchDeletePlan(null)}
+        batchBusy={batchBusy}
       />
 
       {batchCreate && (
