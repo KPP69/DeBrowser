@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DialogLayer } from "../components/Modal";
 import { Activity, Database, Timer } from "lucide-react";
 import {
@@ -86,6 +86,19 @@ export default function DataManagementPage() {
         notifyError(`无法读取数据管理信息：${message}`);
       });
   }, []);
+
+  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
+  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
+  const appPage = useAppStore((state) => state.page);
+  const firstActivation = useRef(true);
+  useEffect(() => {
+    if (firstActivation.current) {
+      firstActivation.current = false;
+      return;
+    }
+    if (appPage === "datamanagement") void refresh();
+  }, [appPage, refresh]);
+
 
   useEffect(() => {
     refresh();
