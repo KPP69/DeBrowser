@@ -55,7 +55,7 @@ export default function SyncDialog(props: {
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
       <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">同步</h3>
@@ -71,7 +71,7 @@ export default function SyncDialog(props: {
                 key={t}
                 type="button"
                 className={
-                  "rounded px-3 py-1 text-sm " + (tab === t ? "bg-(--accent) text-white" : "text-(--text-main)")
+                  "rounded px-3 py-1 text-sm " + (tab === t ? "bg-(--accent) text-(--accent-contrast)" : "text-(--text-main)")
                 }
                 onClick={() => setTab(t)}
               >
@@ -225,7 +225,7 @@ function SyncBookmarksTab(props: {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
           disabled={props.busy || selected.size === 0 || instSelected.size === 0}
           onClick={() =>
             void props.run("同步书签", async (opId) => {
@@ -349,7 +349,7 @@ function SearchTab(props: {
             <button
               key={k}
               type="button"
-              className={"rounded px-3 py-1 text-sm " + (kind === k ? "bg-(--accent) text-white" : "text-(--text-main)")}
+              className={"rounded px-3 py-1 text-sm " + (kind === k ? "bg-(--accent) text-(--accent-contrast)" : "text-(--text-main)")}
               onClick={() => {
                 setKind(k);
                 setSearch(null);
@@ -374,7 +374,7 @@ function SearchTab(props: {
         </label>
         <button
           type="button"
-          className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
           disabled={props.busy}
           onClick={doSearch}
         >
@@ -447,7 +447,7 @@ function SearchTab(props: {
           <div>
             <button
               type="button"
-              className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
               disabled={props.busy || (newName.trim() === "" && (kind === "folder" || newUrl.trim() === ""))}
               onClick={() =>
                 void props.run("同步编辑", async (opId) => {
@@ -467,7 +467,7 @@ function SearchTab(props: {
           {!armDelete ? (
             <button
               type="button"
-              className="rounded-md bg-(--danger) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="rounded-md bg-(--danger) px-3 py-1.5 text-sm text-(--danger-contrast) disabled:opacity-50"
               disabled={props.busy}
               onClick={() => setArmDelete(true)}
             >
@@ -480,7 +480,7 @@ function SearchTab(props: {
               </span>
               <button
                 type="button"
-                className="rounded-md bg-(--danger) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                className="rounded-md bg-(--danger) px-3 py-1.5 text-sm text-(--danger-contrast) disabled:opacity-50"
                 disabled={props.busy}
                 onClick={() =>
                   void props.run("同步删除", async (opId) => {
