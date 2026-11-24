@@ -19,7 +19,7 @@ func TestBindingCallFromMainWorldIsDropped(t *testing.T) {
 		got = append(got, ev)
 	}, nil)
 	tracker.sessions["T"] = "S1"
-	tracker.contexts["T"] = 42 // the isolated world's context id
+	tracker.isoCtx["S1"] = map[int]bool{42: true} // the isolated world's context id
 
 	payload := `{"kind":"visibility","visible":true}`
 	call := func(contextID int) cdp.Event {

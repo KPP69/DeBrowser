@@ -181,6 +181,12 @@ func (s *SyncService) start(masterID string, followerIDs []string) (SyncStateVie
 	sess.masterTrack = newPageTracker(masterClient, true,
 		func(targetID string, ev PageEvent) { s.onMasterEvent(sess, targetID, ev) },
 		func(targetID string) { sess.refreshActive() })
+	// Run-category diagnostics for dropped binding reports
+	// (see sync_page.go); no logger means diagnostics are
+	// skipped, never fatal.
+	if s.Auditor != nil {
+		sess.masterTrack.log = s.Auditor.Logger()
+	}
 	masterTargets, err := listPageTargets(ctx, masterClient)
 	if err != nil {
 		return fail(fmt.Errorf("读取主实例标签失败：%w", err))
