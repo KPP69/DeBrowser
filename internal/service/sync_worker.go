@@ -371,6 +371,12 @@ func (w *followerWorker) scale(x, y float64) (float64, float64) {
 // between events, so they can never race a dispatch.
 func (w *followerWorker) dispatchLoop(ctx context.Context) {
 	defer close(w.loopDone)
+	// One follower's internal failure is isolated to that follower.
+	defer func() {
+		if r := recover(); r != nil {
+			w.markFailed(fmt.Sprintf("内部错误：%v", r))
+		}
+	}()
 	for {
 		select {
 		case <-w.stopCh:
