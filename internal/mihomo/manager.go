@@ -229,7 +229,13 @@ func (m *Manager) Start(ctx context.Context, controllerPort int, client *Client)
 	if ProbePort(controllerPort) {
 		return fmt.Errorf("核心控制端口 %d 已被其他程序占用（可能是已在运行的 Clash 或 Mihomo），DeBrowser 不会接管它；请先关闭占用程序后重试", controllerPort)
 	}
-	logFile, err := os.OpenFile(filepath.Join(m.workdir, "core.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
+	// The core's own log is outside the app's log capacity system;
+	// cap it so a long-lived core cannot fill the disk.
+	coreLog := filepath.Join(m.workdir, "core.log")
+	if fi, statErr := os.Stat(coreLog); statErr == nil && fi.Size() >= 10<<20 {
+		_ = os.Rename(coreLog, coreLog+".1")
+	}
+	logFile, err := os.OpenFile(coreLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
 	if err != nil {
 		return fmt.Errorf("打开核心日志失败：%w", err)
 	}
