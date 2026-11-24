@@ -76,7 +76,7 @@ func (s *System) RemainingBytes() int64 {
 }
 
 // CapacityError returns the most recent capacity-enforcement
-// failure and how many have occurred, for diagnostics.
+// failure and how many have occurred, for the data page.
 func (s *System) CapacityError() (error, int) {
 	if s == nil {
 		return nil, 0
