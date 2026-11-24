@@ -469,7 +469,7 @@ func (s *BookmarkService) syncBookmarks(nodeIDs []string, instanceIDs []string) 
 }
 
 func (s *BookmarkService) syncToInstance(instanceID string, tops []model.BookmarkNode, children map[string][]model.BookmarkNode) SyncInstanceResult {
-	unlock, inst, dir, gate, err := s.instances.LockBookmarkAccess(instanceID)
+	unlock, inst, dir, gate, err := s.instances.lockBookmarkAccess(instanceID)
 	if unlock != nil {
 		defer unlock()
 	}
