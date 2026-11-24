@@ -191,3 +191,14 @@ export function kernelOptionLabels(
   }
   return labels;
 }
+
+// --- Batch verbs ---------------------------------------------------------
+
+// Verbs and operation ids for the batch actions, shared by the
+// page's batch execution and the toolbar's progress line.
+export const BATCH_VERB: Record<BatchAction, string> = { start: "启动", stop: "关闭", delete: "删除" };
+export const BATCH_OP_ACTION: Record<BatchAction, string> = {
+  start: "instance.start",
+  stop: "instance.stop",
+  delete: "instance.delete",
+};
