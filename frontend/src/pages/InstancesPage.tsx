@@ -40,6 +40,7 @@ import {
   type BatchPlanItem,
 } from "./instancesLogic";
 import DeleteDialogs from "../components/instances/DeleteDialogs";
+import BatchCreateDialog, { type BatchCreateState } from "../components/instances/BatchCreateDialog";
 import { inputCls, labelCls, modeButtonCls, modeGroupCls } from "../components/instances/formStyles";
 
 // Three statuses get a small colored dot plus matching text
@@ -99,12 +100,6 @@ function notifyBatchResult(
     (failed.length > 0 ? `，失败 ${failed.length} 个` : "");
   const kind = classifyCounts(okNames.length, failed.length, skipped.length);
   if (kind !== null) notify(kind, summary, { items, important: true });
-}
-
-interface BatchCreateState {
-  prefix: string;
-  count: string;
-  browserId: string;
 }
 
 // The instance-file picker dialog: the options are fetched fresh
@@ -1213,90 +1208,22 @@ export default function InstancesPage() {
         batchBusy={batchBusy}
       />
 
-      {batchCreate && (
-        <Dialog
-          open
-          onClose={() => {
-            if (!batchCreateBusy) setBatchCreate(null);
-          }}
-          onSubmit={() => {
-            if (!batchCreateBusy) void submitBatchCreate();
-          }}
-        >
-            <h3 className="text-base font-semibold">批量创建实例</h3>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className={labelCls}>实例名称前缀（必填）</label>
-                <input
-                  className={inputCls}
-                  value={batchCreate.prefix}
-                  onChange={(e) => setBatchCreate({ ...batchCreate, prefix: e.target.value })}
-                  placeholder="例如：测试浏览器"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>创建数量（必填，一次最多 {MAX_BATCH_CREATE} 个）</label>
-                <input
-                  className={inputCls}
-                  type="number"
-                  min={1}
-                  max={MAX_BATCH_CREATE}
-                  step={1}
-                  value={batchCreate.count}
-                  onChange={(e) => setBatchCreate({ ...batchCreate, count: e.target.value })}
-                />
-                {batchCreate.prefix.trim() !== "" &&
-                  Number.isInteger(Number(batchCreate.count)) &&
-                  Number(batchCreate.count) >= 1 &&
-                  Number(batchCreate.count) <= MAX_BATCH_CREATE && (
-                    <p className="mt-1 text-xs text-(--text-faint)">
-                      将创建：{batchCreate.prefix.trim()}1、{batchCreate.prefix.trim()}2
-                      {Number(batchCreate.count) > 2 && ` …… ${batchCreate.prefix.trim()}${Number(batchCreate.count)}`}
-                      （共 {Number(batchCreate.count)} 个），每个实例自动分配独立的实例文件。
-                    </p>
-                  )}
-              </div>
-              <div>
-                <label className={labelCls}>实例内核（必选）</label>
-                <select
-                  className={inputCls}
-                  value={batchCreate.browserId}
-                  disabled={!browsersLoaded}
-                  onChange={(e) => setBatchCreate({ ...batchCreate, browserId: e.target.value })}
-                >
-                  <option value="">请选择内核</option>
-                  {browsers.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {kernelLabels.get(b.id) ?? b.name}
-                    </option>
-                  ))}
-                </select>
-                {!browsersLoaded && <p className="mt-1 text-xs text-(--text-faint)">内核列表加载中…</p>}
-                {browsersLoaded && browsers.length === 0 && (
-                  <p className="mt-1 text-xs text-(--text-faint)">尚未登记任何浏览器内核，请先在「浏览器内核」页面添加。</p>
-                )}
-              </div>
-              {batchCreateError && <p className="text-sm text-(--danger)">{batchCreateError}</p>}
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setBatchCreate(null)}
-                className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--text-dim) hover:bg-(--hover-bg)"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={batchCreateBusy}
-                onClick={() => void submitBatchCreate()}
-                className="rounded-md bg-(--accent) px-3 py-1.5 text-sm font-medium text-(--accent-contrast) hover:opacity-90 disabled:opacity-50"
-              >
-                创建
-              </button>
-            </div>
-        </Dialog>
-      )}
+      <BatchCreateDialog
+        batchCreate={batchCreate}
+        onChange={(next) => setBatchCreate(next)}
+        kernelOptions={browsers.map((b) => ({ id: b.id, label: kernelLabels.get(b.id) ?? b.name }))}
+        browsersLoaded={browsersLoaded}
+        busy={batchCreateBusy}
+        error={batchCreateError}
+        maxCount={MAX_BATCH_CREATE}
+        onClose={() => {
+          if (!batchCreateBusy) setBatchCreate(null);
+        }}
+        onCancel={() => setBatchCreate(null)}
+        onSubmit={() => {
+          if (!batchCreateBusy) void submitBatchCreate();
+        }}
+      />
     </div>
   );
 }
