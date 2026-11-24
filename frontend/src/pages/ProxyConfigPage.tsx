@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmDialog, DialogLayer } from "../components/Modal";
-import { Gauge, Loader2, Play, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
+import { Loader2, Play, Plus, Square } from "lucide-react";
 import {
   InstanceService,
   ProxyService,
@@ -13,25 +12,19 @@ import {
 import type { Instance } from "../../bindings/github.com/KPP69/DeBrowser/internal/model";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
-import ProxyNodePicker from "../components/ProxyNodePicker";
 import { useAppStore } from "../stores/useAppStore";
 import { usePageRefresh } from "../hooks/usePageRefresh";
+import AddSourceDialog, { type AddSourceTab } from "../components/proxy/AddSourceDialog";
+import SourceCard from "../components/proxy/SourceCard";
+import BindingCard from "../components/proxy/BindingCard";
+import DeleteSourceDialog from "../components/proxy/DeleteSourceDialog";
+import { btnPrimary, btnSecondary } from "../components/proxy/proxyStyles";
+import { errText, PICKER_CANCELLED } from "../components/proxy/proxyUtils";
 
-function errText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-// 用户在系统文件选择器中取消选择时，后端以「未选择文件」
-// 返回。这不是错误：静默结束，不显示任何提示。
-const PICKER_CANCELLED = "未选择文件";
-
-// 代理配置页面：单页完成全部代理操作。布局自上而下为
-// 顶部操作区（启动、添加依次靠左）、独占一行的代理源
-// 卡片、下方并排的代理节点卡片与实例列表卡片（窗口较
-// 窄时上下排列）；三个列表都是标题固定、内容独立纵向
-// 滚动，无任何分页。
-// 绑定数据只有一份：本页与浏览器实例页面读写同一个
-// ProxyService 绑定关系。
+// 代理配置页面：顶部操作区、代理源卡片、下方绑定区（代理
+// 节点卡片与实例列表卡片，窗口较窄时上下排列）；三个列表
+// 标题固定、内容独立纵向滚动，无任何分页。绑定数据只有
+// 一份：本页与浏览器实例页面读写同一个 ProxyService 绑定关系。
 export default function ProxyConfigPage() {
   const [status, setStatus] = useState<CoreStatusView | null>(null);
   const [sources, setSources] = useState<SourceView[]>([]);
@@ -42,10 +35,6 @@ export default function ProxyConfigPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addTab, setAddTab] = useState<"subscription" | "file">("subscription");
-  const [addName, setAddName] = useState("");
-  const [addURL, setAddURL] = useState("");
-  const [addError, setAddError] = useState<string | null>(null);
   const [confirmDeleteSource, setConfirmDeleteSource] = useState<SourceView | null>(null);
   // 测速：仅在用户点击时对全部节点逐个测试，结果只
   // 用于本页显示，不保存、不影响绑定。
@@ -84,7 +73,6 @@ export default function ProxyConfigPage() {
   const appPage = useAppStore((state) => state.page);
   usePageRefresh("proxyconfig", reload);
 
-
   // 轮询只刷新核心状态：节点、绑定、实例列表在操作后刷新，
   // 避免每 3 秒整页重渲染。
   const reloadStatus = useCallback(async () => {
@@ -122,16 +110,9 @@ export default function ProxyConfigPage() {
     const opId = newOperationId();
     try {
       const results = await ProxyService.TestNodes(opId, nodeIds);
-      setTestResults((prev) => {
-        const next = { ...prev };
-        for (const r of results ?? []) next[r.nodeId] = r;
-        return next;
-      });
+      setTestResults((prev) => ({ ...prev, ...Object.fromEntries((results ?? []).map((r) => [r.nodeId, r])) }));
       const okCount = (results ?? []).filter((r) => r.ok).length;
-      notifySuccess(`测速完成：${okCount}/${nodeIds.length} 个节点可用`, {
-        operationId: opId,
-        important: true,
-      });
+      notifySuccess(`测速完成：${okCount}/${nodeIds.length} 个节点可用`, { operationId: opId, important: true });
       recordOperationFeedback(opId, true, "节点测速完成", "代理", "proxy.node_test");
     } catch (e) {
       const message = errText(e);
@@ -191,48 +172,34 @@ export default function ProxyConfigPage() {
 
   const toggleCore = () => {
     if (!status) return;
-    if (status.running) {
-      void run("core", "proxy.core_stop", "代理核心已关闭", async (opId) => {
-        await ProxyService.StopCore(opId);
-      });
-    } else {
-      void run("core", "proxy.core_start", "代理核心已启动", async (opId) => {
-        await ProxyService.StartCore(opId);
-      });
-    }
+    const running = status.running;
+    void run("core", running ? "proxy.core_stop" : "proxy.core_start", running ? "代理核心已关闭" : "代理核心已启动", async (opId) => {
+      if (running) await ProxyService.StopCore(opId);
+      else await ProxyService.StartCore(opId);
+    });
   };
 
-  const submitAdd = async () => {
-    setAddError(null);
-    const name = addName.trim();
-    if (!name) {
-      setAddError("请填写名称。");
-      return;
-    }
-    if (addTab === "subscription" && !addURL.trim()) {
-      setAddError("请填写订阅地址。");
-      return;
-    }
+  // 添加来源：表单校验与错误显示在 AddSourceDialog 内部；这里
+  // 只做服务调用。成功时关闭弹窗（弹窗随之卸载，输入状态自然
+  // 清空）；失败时把错误抛回弹窗显示；文件选择器取消时静默
+  // 结束，弹窗保持打开且不显示错误。
+  const submitAdd = async (tab: AddSourceTab, name: string, url: string) => {
     setBusy("add");
     const opId = newOperationId();
     try {
-      if (addTab === "subscription") {
-        const view = await ProxyService.AddSubscriptionSource(opId, name, addURL.trim());
-        notifySuccess(`订阅已添加：${view.name}（${view.nodeCount} 个节点）`, { operationId: opId, important: true });
-        recordOperationFeedback(opId, true, `订阅已添加：${view.name}`, "代理", "proxy.source_add_subscription");
-      } else {
-        const view = await ProxyService.AddFileSource(opId, name);
-        notifySuccess(`配置文件已添加：${view.name}（${view.nodeCount} 个节点）`, { operationId: opId, important: true });
-        recordOperationFeedback(opId, true, `配置文件已添加：${view.name}`, "代理", "proxy.source_add_file");
-      }
+      const kind = tab === "subscription" ? "订阅" : "配置文件";
+      const view =
+        tab === "subscription"
+          ? await ProxyService.AddSubscriptionSource(opId, name, url)
+          : await ProxyService.AddFileSource(opId, name);
+      notifySuccess(`${kind}已添加：${view.name}（${view.nodeCount} 个节点）`, { operationId: opId, important: true });
+      recordOperationFeedback(opId, true, `${kind}已添加：${view.name}`, "代理", tab === "subscription" ? "proxy.source_add_subscription" : "proxy.source_add_file");
       setAddOpen(false);
-      setAddName("");
-      setAddURL("");
     } catch (e) {
       const message = errText(e);
       if (message !== PICKER_CANCELLED) {
-        setAddError(message);
         recordOperationFeedback(opId, false, `添加配置失败：${message}`, "代理", "proxy.source_add");
+        throw new Error(message);
       }
     } finally {
       setBusy(null);
@@ -243,23 +210,10 @@ export default function ProxyConfigPage() {
   const changeBinding = (instance: Instance, nodeID: string) => {
     const label = nodeID === "" ? `实例「${instance.name}」已取消代理` : `实例「${instance.name}」的代理已更新`;
     void run(`bind-${instance.id}`, "proxy.binding_set", label, async (opId) => {
-      if (nodeID === "") {
-        await ProxyService.ClearBinding(opId, instance.id);
-      } else {
-        await ProxyService.SetBinding(opId, instance.id, nodeID);
-      }
+      if (nodeID === "") await ProxyService.ClearBinding(opId, instance.id);
+      else await ProxyService.SetBinding(opId, instance.id, nodeID);
     });
   };
-
-  const inputCls =
-    "w-full rounded-md border border-(--border) bg-(--input-bg) px-2.5 py-1.5 text-sm text-(--text-main) outline-none placeholder:text-(--text-faint) disabled:opacity-50";
-  const labelCls = "mb-1 block text-xs text-(--text-dim)";
-  const btnPrimary =
-    "inline-flex h-9 items-center gap-1.5 rounded-md bg-(--accent) px-3 text-sm font-medium text-(--accent-contrast) transition hover:opacity-90 disabled:opacity-50";
-  const btnSecondary =
-    "inline-flex h-9 items-center gap-1.5 rounded-md border border-(--border-strong) bg-(--input-bg) px-3 text-sm text-(--text-main) transition hover:bg-(--hover-bg) disabled:opacity-50";
-  const btnSmall =
-    "inline-flex h-7 items-center gap-1 rounded-md border border-(--border-strong) bg-(--input-bg) px-2 text-xs text-(--text-main) transition hover:bg-(--hover-bg) disabled:opacity-50";
 
   return (
     <div className="flex h-full flex-col gap-4 p-5">
@@ -269,16 +223,12 @@ export default function ProxyConfigPage() {
           {busy === "core" ? <Loader2 size={15} className="animate-spin" /> : status?.running ? <Square size={15} /> : <Play size={15} />}
           {status?.running ? "关闭" : "启动"}
         </button>
-        <button type="button" className={btnSecondary} disabled={busy !== null} onClick={() => { setAddError(null); setAddOpen(true); }}>
+        <button type="button" className={btnSecondary} disabled={busy !== null} onClick={() => setAddOpen(true)}>
           <Plus size={15} />
           添加
         </button>
         <span className="ml-1 text-sm text-(--text-dim)">
-          {status === null
-            ? "正在读取核心状态…"
-            : status.running
-              ? `代理核心运行中（Mihomo ${status.version}）`
-              : "代理核心未启动"}
+          {status === null ? "正在读取核心状态…" : status.running ? `代理核心运行中（Mihomo ${status.version}）` : "代理核心未启动"}
         </span>
         {status?.message && <span className="text-sm text-(--danger)">{status.message}</span>}
       </div>
@@ -290,209 +240,51 @@ export default function ProxyConfigPage() {
       ) : loadError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
           <p className="text-sm text-(--danger)">加载代理配置失败：{loadError}</p>
-          <button type="button" className={btnSecondary} onClick={() => void reload()}>
-            重试
-          </button>
+          <button type="button" className={btnSecondary} onClick={() => void reload()}>重试</button>
         </div>
       ) : (
         <>
           {/* 代理源卡片：独占一行；标题与表头固定，
               数据行内部纵向滚动（无分页）。 */}
-          <section className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel-bg)">
-            <h3 className="shrink-0 border-b border-(--border) px-4 py-2.5 text-[15px] font-semibold">代理源</h3>
-            {sources.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-(--text-faint)">尚未添加任何代理配置。点击右上方「添加」导入订阅或本地配置文件。</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[36rem]">
-                <div className="grid grid-cols-[minmax(0,1fr)_5rem_5.5rem_5rem_10rem] items-center gap-2 border-b border-(--border) px-4 py-2 text-center text-xs text-(--text-faint)">
-                  <span>名称</span>
-                  <span>节点数</span>
-                  <span>来源</span>
-                  <span>状态</span>
-                  <span>操作</span>
-                </div>
-                <div className="max-h-40 overflow-y-auto px-4">
-                  {sources.map((src) => (
-                    <div
-                      key={src.id}
-                      className="grid grid-cols-[minmax(0,1fr)_5rem_5.5rem_5rem_10rem] items-center gap-2 border-b border-(--border) py-2 text-center last:border-b-0"
-                    >
-                      <span className="truncate text-sm font-medium" title={src.name}>
-                        {src.name}
-                      </span>
-                      <span className="text-sm">{src.nodeCount} 个</span>
-                      <span className="text-sm">{src.kind === "subscription" ? "订阅" : "本地文件"}</span>
-                      <span className="text-sm">{src.nodeCount > 0 ? "正常" : "无节点"}</span>
-                      <span className="flex items-center justify-center gap-1.5">
-                        <button type="button" className={btnSmall} disabled={busy !== null} onClick={() => updateSource(src)}>
-                          <RefreshCw size={12} />
-                          更新
-                        </button>
-                        <button type="button" className={btnSmall} disabled={busy !== null} onClick={() => setConfirmDeleteSource(src)}>
-                          <Trash2 size={12} />
-                          删除
-                        </button>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                </div>
-              </div>
-            )}
-          </section>
+          <SourceCard
+            sources={sources}
+            disabled={busy !== null}
+            onRefresh={updateSource}
+            onRequestDelete={setConfirmDeleteSource}
+          />
 
           {/* 下方左右并排：代理节点卡片与实例列表卡片，
               等高，各自内部纵向滚动（无分页）。 */}
-          <div className="flex min-h-0 flex-1 flex-col gap-4 min-[1150px]:flex-row">
-            {/* 代理节点卡片：标题栏（标题 + 测速）固定，
-                只有节点列表滚动。 */}
-            <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel-bg)">
-              <div className="flex shrink-0 items-center gap-3 border-b border-(--border) px-4 py-2.5">
-                <h3 className="min-w-0 flex-1 text-[15px] font-semibold">代理节点</h3>
-                <button
-                  type="button"
-                  className={`${btnSmall} w-20 shrink-0 justify-center`}
-                  disabled={testing || busy !== null || nodes.length === 0}
-                  onClick={() => void runTest()}
-                >
-                  {testing ? <Loader2 size={13} className="animate-spin" /> : <Gauge size={13} />}
-                  测速
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
-                {nodes.length === 0 ? (
-                  <p className="py-1 text-sm text-(--text-faint)">暂无节点。</p>
-                ) : (
-                  <div>
-                    {nodes.map((n) => {
-                      const result = testResults[n.id];
-                      return (
-                        <div key={n.id} className="flex items-center gap-2 border-b border-(--border) py-2 last:border-b-0">
-                          <span className="min-w-0 flex-1 truncate text-sm">{n.name}</span>
-                          {result ? (
-                            result.ok ? (
-                              <span className="shrink-0 text-xs text-(--accent)">{result.delayMs} ms</span>
-                            ) : (
-                              <span className="shrink-0 text-xs text-(--danger)">不可用</span>
-                            )
-                          ) : (
-                            <span className="shrink-0 text-xs text-(--text-faint)">未测试</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* 实例列表卡片：标题固定，实例行内部滚动。 */}
-            <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel-bg)">
-              <h3 className="shrink-0 border-b border-(--border) px-4 py-2.5 text-[15px] font-semibold">实例列表</h3>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
-                {instances.length === 0 ? (
-                  <p className="py-1 text-sm text-(--text-faint)">尚未创建任何浏览器实例。</p>
-                ) : (
-                  <div>
-                    {instances.map((inst) => {
-                      const binding = bindingByInstance.get(inst.id);
-                      return (
-                        <div key={inst.id} className="flex items-center gap-3 border-b border-(--border) py-2 last:border-b-0">
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">{inst.name}</span>
-                          <div className="w-56 shrink-0">
-                            <ProxyNodePicker
-                              nodes={nodes}
-                              value={binding?.nodeId ?? ""}
-                              disabled={busy !== null}
-                              onChange={(nodeId) => changeBinding(inst, nodeId)}
-                              ariaLabel={`实例 ${inst.name} 的代理节点`}
-                            />
-                          </div>
-                          <span className="w-16 shrink-0 text-right text-xs text-(--text-faint)">
-                            {binding ? `端口 ${binding.listenPort}` : "未设置"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+          <BindingCard
+            nodes={nodes}
+            testResults={testResults}
+            testing={testing}
+            disabled={busy !== null}
+            onTest={() => void runTest()}
+            instances={instances}
+            bindingByInstance={bindingByInstance}
+            onChangeBinding={changeBinding}
+          />
         </>
       )}
 
       {/* 添加弹窗 */}
       {addOpen && (
-        <DialogLayer
+        <AddSourceDialog
           open
-          onClose={() => {
-            if (busy === null) setAddOpen(false);
-          }}
-          onSubmit={() => {
-            if (busy === null) void submitAdd();
-          }}
-        >
-          <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
-            <h3 className="text-base font-semibold">添加代理配置</h3>
-            <div className="mt-4 inline-flex overflow-hidden rounded-md border border-(--border-strong)">
-              <button
-                type="button"
-                className={`h-8 px-3.5 text-sm transition-colors ${addTab === "subscription" ? "bg-(--accent) font-medium text-(--accent-contrast)" : "text-(--text-main) hover:bg-(--hover-bg)"}`}
-                onClick={() => { setAddTab("subscription"); setAddError(null); }}
-              >
-                添加订阅
-              </button>
-              <button
-                type="button"
-                className={`h-8 px-3.5 text-sm transition-colors ${addTab === "file" ? "bg-(--accent) font-medium text-(--accent-contrast)" : "text-(--text-main) hover:bg-(--hover-bg)"}`}
-                onClick={() => { setAddTab("file"); setAddError(null); }}
-              >
-                本地添加
-              </button>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className={labelCls}>名称</label>
-                <input className={inputCls} value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="例如：我的订阅" />
-              </div>
-              {addTab === "subscription" ? (
-                <div>
-                  <label className={labelCls}>订阅地址</label>
-                  <input className={inputCls} value={addURL} onChange={(e) => setAddURL(e.target.value)} placeholder="https://…" />
-                </div>
-              ) : (
-                <p className="text-sm text-(--text-dim)">点击「添加」后将打开系统文件选择窗口，请选择 Clash/Mihomo 的 YAML 配置文件。</p>
-              )}
-              {addError && <p className="text-sm text-(--danger)">{addError}</p>}
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className={btnSecondary} disabled={busy !== null} onClick={() => setAddOpen(false)}>
-                取消
-              </button>
-              <button type="button" className={btnPrimary} disabled={busy !== null} onClick={() => void submitAdd()}>
-                {busy === "add" ? <Loader2 size={15} className="animate-spin" /> : null}
-                添加
-              </button>
-            </div>
-          </div>
-        </DialogLayer>
+          busy={busy !== null}
+          submitting={busy === "add"}
+          onClose={() => setAddOpen(false)}
+          onSubmit={submitAdd}
+        />
       )}
 
       {/* 删除来源确认 */}
-      <ConfirmDialog
-        open={confirmDeleteSource !== null}
-        title={confirmDeleteSource ? `删除代理配置「${confirmDeleteSource.name}」` : "删除代理配置"}
-        impact="其全部节点将被移除，正在使用这些节点的实例将变为未设置代理。此操作不可恢复。"
-        count={1}
-        countLabel="个代理配置"
-        confirmLabel="删除"
+      <DeleteSourceDialog
+        source={confirmDeleteSource}
         busy={busy !== null}
         onCancel={() => setConfirmDeleteSource(null)}
-        onConfirm={() => {
-          if (!confirmDeleteSource) return;
-          const src = confirmDeleteSource;
+        onConfirm={(src) => {
           setConfirmDeleteSource(null);
           void run(`delete-${src.id}`, "proxy.source_delete", `代理配置「${src.name}」已删除`, async (opId) => {
             await ProxyService.DeleteSource(opId, src.id);
