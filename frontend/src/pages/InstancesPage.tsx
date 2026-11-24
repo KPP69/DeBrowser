@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ConfirmDialog, Dialog } from "../components/Modal";
+import { ConfirmDialog, Dialog, DialogLayer } from "../components/Modal";
 import {
   AppWindow,
   ChevronDown,
@@ -1117,7 +1117,7 @@ export default function InstancesPage() {
       )}
 
       {profilePicker && form && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-(--overlay) px-4">
+        <DialogLayer open onClose={() => setProfilePicker(null)} zIndex={20}>
           <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">选择实例文件</h3>
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-md border border-(--border)">
@@ -1154,7 +1154,7 @@ export default function InstancesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       <ConfirmDialog
