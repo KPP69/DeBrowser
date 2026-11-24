@@ -95,8 +95,8 @@ func (s *AppService) GetStatus() Status {
 	}
 }
 
-// GetSettings returns the current user settings. The language is
-// always Simplified Chinese (zh-CN); the theme is user-selectable.
+// GetSettings returns the current user settings. The UI language is
+// fixed to Simplified Chinese; the theme is user-selectable.
 func (s *AppService) GetSettings() settings.Settings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
