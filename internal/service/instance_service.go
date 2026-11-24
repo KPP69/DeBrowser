@@ -54,6 +54,14 @@ type InstanceService struct {
 	procs      map[string]*procWatch
 	transient  map[string]model.InstanceStatus
 	unverified map[string]bool
+	// fileMu serializes operations that decide about an instance's
+	// profile folder: starting its browser, deleting/renaming the
+	// folder, and reading or writing its bookmark file. The gate
+	// (InstanceBookmarkAccess) and the file operation must happen
+	// under the same per-instance lock, otherwise a bookmark write
+	// can race a browser launch and the browser overwrites it.
+	fileMu   sync.Mutex
+	fileLock map[string]*sync.Mutex
 	// reconcileEvents accumulates the outcomes of the startup
 	// runtime reconciliation (which runs in the constructor,
 	// before the Auditor is wired) so ReportReconciliation can
@@ -101,6 +109,7 @@ func newInstanceService(db *database.DB, layout paths.Layout, log *slog.Logger, 
 		procs:      map[string]*procWatch{},
 		transient:  map[string]model.InstanceStatus{},
 		unverified: map[string]bool{},
+		fileLock:   map[string]*sync.Mutex{},
 	}
 	s.deleteRecord = s.store.DeleteInstance
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -537,6 +546,9 @@ func (s *InstanceService) updateInstance(input UpdateInstanceInput, op *logging.
 // (the instance was never started), an empty folder is created at
 // the new name instead — there is no data to move.
 func (s *InstanceService) renameProfileDir(c context.Context, inst model.Instance, newName string) (string, func() error, error) {
+	// The move must not race a bookmark read/write or a launch.
+	unlock := s.lockInstanceFiles(inst.ID)
+	defer unlock()
 	if err := s.validateProfileName(newName); err != nil {
 		return "", nil, err
 	}
@@ -655,6 +667,10 @@ func (s *InstanceService) DeleteInstanceAndProfile(operationID string, id string
 func (s *InstanceService) deleteInstanceAndProfile(id string, op *logging.Operation) error {
 	c, cancel := ctx()
 	defer cancel()
+	// Hold the instance's file lock for the whole destruction: a
+	// bookmark write must never run against a folder being deleted.
+	unlock := s.lockInstanceFiles(id)
+	defer unlock()
 	in, err := s.store.GetInstance(c, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
