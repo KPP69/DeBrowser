@@ -314,13 +314,12 @@ export default function SyncPage() {
         </table>
       </section>
 
-      <section className="rounded-xl border border-(--border) bg-(--panel-bg) p-4 text-sm leading-relaxed text-(--text-dim)">
-        <h2 className="mb-2 text-sm font-medium text-(--text-main)">能力说明</h2>
+            <section className="rounded-xl border border-(--border) bg-(--panel-bg) p-4 text-sm leading-relaxed text-(--text-dim)">
+        <h2 className="mb-2 text-sm font-medium text-(--text-main)">使用说明</h2>
         <ul className="list-disc space-y-1 pl-5">
-          <li>可靠支持：页面点击、移动、滚动、拖动、键盘与文本输入（含中文输入法最终文本）、新建/关闭/切换标签、页面导航与刷新。</li>
-          <li>条件支持：前进/后退取决于各实例自身的浏览历史；扩展弹窗与个别原生控件无法保证识别，不做猜测性操作。</li>
-          <li>不支持：浏览器原生界面文字的逐字同步（地址栏未提交文字等）、剪贴板同步、页面缩放同步、最小化状态同步、跨域 iframe 内的操作。</li>
-          <li>同步不移动系统鼠标、不抢占前台焦点；不记录网页内容、输入文本与浏览历史。</li>
+          <li>选一个主控，勾选跟随实例</li>
+          <li>先点「排列窗口」，后点「开始同步」</li>
+          <li>同步期间窗口重叠，同步暂停，再点「排列窗口」即可恢复</li>
         </ul>
       </section>
       </div>
