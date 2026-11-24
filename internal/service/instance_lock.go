@@ -26,13 +26,13 @@ func (s *InstanceService) lockInstanceFiles(id string) func() {
 	return mu.Unlock
 }
 
-// LockBookmarkAccess acquires the instance's file lock and then runs
+// lockBookmarkAccess acquires the instance's file lock and then runs
 // the bookmark gate, so callers can hold the returned unlock for the
 // whole read/write of the Bookmarks file. The gate result is the SOLE
 // decision input: holding the lock does not by itself allow access.
 // When the gate is not "stopped", the lock is released before
 // returning and unlock is nil.
-func (s *InstanceService) LockBookmarkAccess(id string) (unlock func(), inst model.Instance, dir, gate string, err error) {
+func (s *InstanceService) lockBookmarkAccess(id string) (unlock func(), inst model.Instance, dir, gate string, err error) {
 	unlock = s.lockInstanceFiles(id)
 	inst, dir, gate, err = s.InstanceBookmarkAccess(id)
 	if err != nil || gate != BookmarkGateStopped {
