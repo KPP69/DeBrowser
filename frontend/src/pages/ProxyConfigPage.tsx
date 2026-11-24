@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmDialog } from "../components/Modal";
+import { ConfirmDialog, DialogLayer } from "../components/Modal";
 import { Gauge, Loader2, Play, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
   InstanceService,
@@ -406,7 +406,15 @@ export default function ProxyConfigPage() {
 
       {/* 添加弹窗 */}
       {addOpen && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+        <DialogLayer
+          open
+          onClose={() => {
+            if (busy === null) setAddOpen(false);
+          }}
+          onSubmit={() => {
+            if (busy === null) void submitAdd();
+          }}
+        >
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">添加代理配置</h3>
             <div className="mt-4 inline-flex overflow-hidden rounded-md border border-(--border-strong)">
@@ -450,7 +458,7 @@ export default function ProxyConfigPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       {/* 删除来源确认 */}
