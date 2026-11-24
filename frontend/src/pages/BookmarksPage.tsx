@@ -294,7 +294,7 @@ export default function BookmarksPage() {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="flex items-center gap-1 rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          className="flex items-center gap-1 rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
           disabled={busy !== null}
           onClick={() => setCreateTab("bookmark")}
         >
@@ -304,7 +304,7 @@ export default function BookmarksPage() {
           type="button"
           className={
             "flex items-center gap-1 rounded-md px-3 py-1.5 text-sm disabled:opacity-50 " +
-            (editMode ? "bg-(--accent) text-white" : "bg-(--hover-bg) text-(--text-main)")
+            (editMode ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--hover-bg) text-(--text-main)")
           }
           disabled={busy !== null}
           onClick={() => setEditMode((v) => !v)}
@@ -327,7 +327,7 @@ export default function BookmarksPage() {
             )}
             <button
               type="button"
-              className="flex items-center gap-1 rounded-md bg-(--danger) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md bg-(--danger) px-3 py-1.5 text-sm text-(--danger-contrast) disabled:opacity-50"
               disabled={busy !== null}
               onClick={() => void doDelete()}
             >
@@ -513,7 +513,7 @@ export default function BookmarksPage() {
 
       {syncGate !== "idle" && (
         <div
-          className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4"
+          className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4"
           onClick={() => {
             // 点击窗口外区域等同于取消（关闭处理中不允许取消）。
             if (syncGate === "confirm") setSyncGate("idle");
@@ -536,7 +536,7 @@ export default function BookmarksPage() {
                 <div className="mt-4 flex flex-col gap-2">
                   <button
                     type="button"
-                    className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white"
+                    className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast)"
                     onClick={() => void closeInstancesThenSync()}
                   >
                     关闭实例
@@ -664,7 +664,7 @@ function CreateDialog(props: {
   const [parentId, setParentId] = useState("");
   const isBookmark = props.tab === "bookmark";
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
       <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">新建</h3>
@@ -674,7 +674,7 @@ function CreateDialog(props: {
                 key={t}
                 type="button"
                 className={
-                  "rounded px-3 py-1 text-sm " + (props.tab === t ? "bg-(--accent) text-white" : "text-(--text-main)")
+                  "rounded px-3 py-1 text-sm " + (props.tab === t ? "bg-(--accent) text-(--accent-contrast)" : "text-(--text-main)")
                 }
                 onClick={() => props.onTab(t)}
               >
@@ -715,7 +715,7 @@ function CreateDialog(props: {
           </button>
           <button
             type="button"
-            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
             disabled={props.busy}
             onClick={() =>
               void props.onSubmit({
@@ -746,7 +746,7 @@ function EditDialog(props: {
   const [parentId, setParentId] = useState(props.node.parentId ?? "");
   const isBookmark = props.node.kind === "bookmark";
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
       <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
         <h3 className="text-base font-semibold">编辑{isBookmark ? "书签" : "文件夹"}</h3>
         <div className="mt-3 flex flex-col gap-3">
@@ -780,7 +780,7 @@ function EditDialog(props: {
           </button>
           <button
             type="button"
-            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-(--accent-contrast) disabled:opacity-50"
             disabled={props.busy}
             onClick={() =>
               void props.onSubmit({
