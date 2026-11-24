@@ -28,8 +28,8 @@ export function EffectiveLogCapacityBytes(): $CancellablePromise<number> {
 }
 
 /**
- * GetSettings returns the current user settings. The language is
- * always Simplified Chinese (zh-CN); the theme is user-selectable.
+ * GetSettings returns the current user settings. The UI language is
+ * fixed to Simplified Chinese; the theme is user-selectable.
  */
 export function GetSettings(): $CancellablePromise<settings$0.Settings> {
     return $Call.ByID(3087195619);
