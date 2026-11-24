@@ -269,6 +269,18 @@ export default function InstancesPage() {
 
   const load = useCallback(() => loadAll(true), [loadAll]);
   const refresh = useCallback(() => loadAll(false), [loadAll]);
+  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
+  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
+  const appPage = useAppStore((state) => state.page);
+  const firstActivation = useRef(true);
+  useEffect(() => {
+    if (firstActivation.current) {
+      firstActivation.current = false;
+      return;
+    }
+    if (appPage === "instances") void refresh();
+  }, [appPage, refresh]);
+
 
   useEffect(() => {
     void load();
