@@ -20,8 +20,8 @@ import (
 //     capped).
 //
 // Dropping is deliberate: a missing debug attribute is harmless,
-// while a leaked credential in a log file — which diagnostics may
-// later export — is not.
+// while a leaked credential in a log file — which a log export
+// copies out of the machine — is not.
 
 var deniedAttrKeys = map[string]bool{
 	"password": true, "passwd": true, "pwd": true,
@@ -36,9 +36,9 @@ var deniedAttrKeys = map[string]bool{
 	"apikey": true, "api_key": true, "api-key": true,
 	"vault": true, "envelope": true, "blob": true,
 	// Filesystem locations: absolute paths disclose the user's
-	// directory layout and must not reach log files (diagnostic
+	// directory layout and must not reach log files (log export
 	// exports leave the machine). Error TEXT can still contain a
-	// path; the export pipeline redacts those (see the diagnostics
+	// path; the export pipeline redacts those (see the log export
 	// service), but path-valued attributes stop here.
 	"dir": true, "path": true, "file": true, "filename": true,
 	"root": true, "datadir": true, "data_dir": true,
