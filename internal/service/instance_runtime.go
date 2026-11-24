@@ -617,6 +617,13 @@ func (s *InstanceService) startInstance(id string, op *logging.Operation) error 
 	} else {
 		return fail(fmt.Errorf("实例文件无法访问：%w", lerr))
 	}
+	// An untracked browser may still own the profile (it
+	// restarted itself after an update). Never start a second
+	// browser on the same profile.
+	if profileLocked(launchDir) {
+		return fail(fmt.Errorf("实例文件正被浏览器占用（可能是浏览器自行重启），请先关闭该浏览器"))
+	}
+
 	// No other tracked instance may be using this folder (the
 	// unique binding already guarantees this; this is the live
 	// double-check).
