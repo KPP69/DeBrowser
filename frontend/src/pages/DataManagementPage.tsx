@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { DialogLayer } from "../components/Modal";
 import { Activity, Database, Timer } from "lucide-react";
 import {
   DiagnosticsService,
@@ -325,7 +326,7 @@ export default function DataManagementPage() {
       </section>
 
       {exportDialog && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+        <DialogLayer open onClose={() => setExportDialog(null)} onSubmit={confirmRecordsExport}>
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">
               导出{RECORD_ROWS.find((r) => r.key === exportDialog)?.label}
@@ -388,11 +389,11 @@ export default function DataManagementPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       {capacityDialog && view && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-(--overlay) px-4">
+        <DialogLayer open onClose={() => setCapacityDialog(false)} onSubmit={confirmCapacity}>
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">日志存储容量</h3>
             <div className="mt-3 space-y-1 text-sm text-(--text-dim)">
@@ -467,7 +468,7 @@ export default function DataManagementPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );
