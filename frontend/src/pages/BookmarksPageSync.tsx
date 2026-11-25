@@ -305,16 +305,18 @@ function SearchTab(props: {
   ): Promise<{ ok: boolean; message: string } | void> => {
     const res = await apply();
     const verb = props.mode === "delete" ? "删除" : "修改";
-    const kind = classifyApplyResult(res);
-    if (kind === null) return; // 没有执行任何项目：不通知
+    // 注意：局部变量不用 kind，避免遮蔽外层 state kind（搜索
+    // 类型 "bookmark"|"folder"）；下方刷新必须用外层 kind。
+    const resultKind = classifyApplyResult(res);
+    if (resultKind === null) return; // 没有执行任何项目：不通知
     const summary =
-      kind === "error"
+      resultKind === "error"
         ? `${verb}失败：处理 ${res.updatedInstances} 个实例 · 失败 ${res.failedInstances} · 跳过 ${res.skippedInstances}`
-        : kind === "info"
+        : resultKind === "info"
           ? `${verb}未执行（全部跳过）：跳过 ${res.skippedInstances} 个实例`
           : `${verb}完成：处理 ${res.updatedInstances} 个实例 · 失败 ${res.failedInstances} · 跳过 ${res.skippedInstances}`;
     const detail = `处理 ${res.affectedNodes} 项 · 失败 ${res.failedNodes} 项`;
-    notify(kind, summary, {
+    notify(resultKind, summary, {
       detail,
       operationId: opId,
       important: true,

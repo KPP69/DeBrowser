@@ -146,6 +146,31 @@ export function planBatchCreate(
   return { ok: true, names };
 }
 
+// --- Status labels -------------------------------------------------------
+
+export const STATUS_LABEL: Record<string, string> = {
+  stopped: "已关闭",
+  starting: "启动中",
+  running: "运行中",
+  stopping: "关闭中",
+  error: "异常",
+  unknown: "无法确认",
+};
+
+// Statuses in which the instance's browser may be alive: kernel
+// and instance-file changes, and deletion, are refused (the
+// backend enforces the same gates).
+export const ACTIVE_STATUSES = new Set(["running", "starting", "stopping", "unknown"]);
+
+// profileFolderOf renders an instance's user-data directory as the
+// folder name shown in the UI: the "profiles/" prefix is stripped,
+// anything else is shown as-is.
+export function profileFolderOf(inst: { userDataDir: string }): string {
+  return inst.userDataDir.startsWith("profiles/")
+    ? inst.userDataDir.slice("profiles/".length)
+    : inst.userDataDir;
+}
+
 // --- Kernel option labels ----------------------------------------------
 
 // kernelOptionLabels maps each registered browser's id to the
@@ -166,3 +191,14 @@ export function kernelOptionLabels(
   }
   return labels;
 }
+
+// --- Batch verbs ---------------------------------------------------------
+
+// Verbs and operation ids for the batch actions, shared by the
+// page's batch execution and the toolbar's progress line.
+export const BATCH_VERB: Record<BatchAction, string> = { start: "启动", stop: "关闭", delete: "删除" };
+export const BATCH_OP_ACTION: Record<BatchAction, string> = {
+  start: "instance.start",
+  stop: "instance.stop",
+  delete: "instance.delete",
+};

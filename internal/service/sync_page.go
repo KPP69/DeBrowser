@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -12,8 +13,13 @@ import (
 )
 
 // syncWorldName is the isolated world the observer script runs in.
-// The report binding is registered for that world only, so a page's
-// own scripts (the main world) can never call it to forge events.
+// The report binding is registered globally (for every execution
+// context), and bindingCalled reports are accepted only when they
+// come from a context recorded in isoCtx — i.e. an isolated world
+// created for this sync world. A page's own scripts (the main
+// world) can therefore never forge events, and navigation, which
+// creates a fresh isolated-world context, no longer breaks sync:
+// the new context is recorded as soon as it appears.
 const syncWorldName = "debrowser-sync"
 
 // pageTracker attaches to the page targets of ONE browser
@@ -31,11 +37,26 @@ type pageTracker struct {
 	mu         sync.Mutex
 	sessions   map[string]string // targetID -> sessionID
 	mainFrames map[string]string // targetID -> main frameID
-	contexts   map[string]int    // targetID -> isolated contextID
-	attaching  map[string]*attachCall
-	ready      map[string]bool
-	visible    map[string]bool
-	urls       map[string]string
+	// isoCtx records every isolated-world execution context
+	// seen for a session (keyed by sessionID, not targetID):
+	// the explicitly created world, the worlds created for
+	// new documents, and sub-frame worlds alike. Navigation
+	// creates a fresh context, which is simply added; stale
+	// IDs stay in the set harmlessly until the session is
+	// forgotten. A context ID is never trusted merely for
+	// being present here — it must also be a context the
+	// browser reported for this session's sync world.
+	isoCtx    map[string]map[int]bool
+	attaching map[string]*attachCall
+	ready     map[string]bool
+	visible   map[string]bool
+	urls      map[string]string
+
+	// log is the run-category logger (logging.System.Logger),
+	// set by the owning service when one exists; nil in tests
+	// and when no auditor is configured, in which case
+	// diagnostic logging is skipped.
+	log *slog.Logger
 }
 
 type attachCall struct {
@@ -51,7 +72,7 @@ func newPageTracker(client *cdp.Client, master bool, onEvent func(string, PageEv
 		onReady:    onReady,
 		sessions:   map[string]string{},
 		mainFrames: map[string]string{},
-		contexts:   map[string]int{},
+		isoCtx:     map[string]map[int]bool{},
 		attaching:  map[string]*attachCall{},
 		ready:      map[string]bool{},
 		visible:    map[string]bool{},
@@ -148,13 +169,17 @@ func (t *pageTracker) URL(targetID string) string {
 	return t.urls[targetID]
 }
 
-// Forget drops all bookkeeping for a destroyed target.
+// Forget drops all bookkeeping for a destroyed target,
+// including its isolated-world context set, so long-running
+// sessions do not accumulate stale entries.
 func (t *pageTracker) Forget(targetID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if sid, ok := t.sessions[targetID]; ok {
+		delete(t.isoCtx, sid)
+	}
 	delete(t.sessions, targetID)
 	delete(t.mainFrames, targetID)
-	delete(t.contexts, targetID)
 	delete(t.ready, targetID)
 	delete(t.visible, targetID)
 	delete(t.urls, targetID)
@@ -190,9 +215,10 @@ func (t *pageTracker) Attach(ctx context.Context, targetID string) error {
 	call.err = err
 	close(call.done)
 	if err != nil {
+		// The attach defer already dropped this target's
+		// isoCtx entry (if any) together with the session.
 		delete(t.sessions, targetID)
 		delete(t.mainFrames, targetID)
-		delete(t.contexts, targetID)
 		delete(t.ready, targetID)
 	}
 	t.mu.Unlock()
@@ -227,7 +253,7 @@ func (t *pageTracker) attach(ctx context.Context, targetID string) (err error) {
 			t.mu.Lock()
 			delete(t.sessions, targetID)
 			delete(t.mainFrames, targetID)
-			delete(t.contexts, targetID)
+			delete(t.isoCtx, sid)
 			delete(t.ready, targetID)
 			t.mu.Unlock()
 		}
@@ -240,8 +266,15 @@ func (t *pageTracker) attach(ctx context.Context, targetID string) (err error) {
 		return err
 	}
 	if t.master {
+		// Global registration: the binding exists in every
+		// execution context, and onBindingCalled admits only
+		// reports from contexts recorded in isoCtx. Scoping
+		// the registration to the isolated world by name
+		// would leave contexts created after a navigation
+		// unbound — the exact failure this set-based filter
+		// replaces.
 		if _, err := t.client.Call(ctx, sid, "Runtime.addBinding", map[string]any{
-			"name": capture.BindingName, "executionContextName": syncWorldName,
+			"name": capture.BindingName,
 		}); err != nil {
 			return err
 		}
@@ -310,8 +343,13 @@ func (t *pageTracker) installInExistingWorld(ctx context.Context, targetID, sid 
 		return fmt.Errorf("创建页面隔离执行环境失败")
 	}
 	t.mu.Lock()
-	t.contexts[targetID] = world.ExecutionContextID
+	if t.isoCtx[sid] == nil {
+		t.isoCtx[sid] = map[int]bool{}
+	}
+	t.isoCtx[sid][world.ExecutionContextID] = true
 	t.mu.Unlock()
+	// No addBinding here: the binding is registered globally
+	// at attach time, so it already exists in this world.
 	if _, err := t.client.Call(ctx, sid, "Runtime.evaluate", map[string]any{
 		"expression": capture.Script, "contextId": world.ExecutionContextID,
 	}); err != nil {
@@ -320,6 +358,14 @@ func (t *pageTracker) installInExistingWorld(ctx context.Context, targetID, sid 
 	return nil
 }
 
+// onContextCreated is pure bookkeeping: whenever the browser
+// reports a new execution context for the sync isolated world
+// — the main frame's world after a navigation, or a sub-frame's
+// world — its ID is added to the session's set in isoCtx. It
+// issues no CDP calls, so a later navigation can never leave
+// the tracker trusting a stale context, and no event is ever
+// delayed by work done here. Contexts of any other world (the
+// page's main world has an empty name) are ignored.
 func (t *pageTracker) onContextCreated(ev cdp.Event) {
 	if !t.master {
 		return
@@ -337,44 +383,28 @@ func (t *pageTracker) onContextCreated(ev cdp.Event) {
 	if err := json.Unmarshal(ev.Params, &p); err != nil {
 		return
 	}
-	if p.Context.Name != syncWorldName || !p.Context.AuxData.IsMain {
-		return // only the top frame's isolated world is bound
+	if p.Context.Name != syncWorldName || p.Context.ID == 0 || ev.SessionID == "" {
+		return
 	}
 	t.mu.Lock()
-	targetID := ""
-	for id, frameID := range t.mainFrames {
-		if frameID == p.Context.AuxData.FrameID {
-			targetID = id
+	defer t.mu.Unlock()
+	// Only record contexts for sessions this tracker owns;
+	// anything else is a stray event from a session that was
+	// never attached or already forgotten.
+	known := false
+	for _, sid := range t.sessions {
+		if sid == ev.SessionID {
+			known = true
 			break
 		}
 	}
-	if targetID == "" {
-		t.mu.Unlock()
+	if !known {
 		return
 	}
-	if _, dup := t.contexts[targetID]; dup {
-		t.mu.Unlock()
-		return
+	if t.isoCtx[ev.SessionID] == nil {
+		t.isoCtx[ev.SessionID] = map[int]bool{}
 	}
-	t.contexts[targetID] = p.Context.ID
-	sid := t.sessions[targetID]
-	t.mu.Unlock()
-	if sid == "" {
-		return
-	}
-	// Binding must be (re)issued inside the new context. The
-	// CDP calls run off the event dispatcher so event order
-	// for input is never delayed by them.
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_, _ = t.client.Call(ctx, sid, "Runtime.addBinding", map[string]any{
-			"name": capture.BindingName, "executionContextId": p.Context.ID,
-		})
-		_, _ = t.client.Call(ctx, sid, "Runtime.evaluate", map[string]any{
-			"expression": capture.Script, "contextId": p.Context.ID,
-		})
-	}()
+	t.isoCtx[ev.SessionID][p.Context.ID] = true
 }
 
 func (t *pageTracker) onFrameNavigated(ev cdp.Event) {
@@ -423,11 +453,18 @@ func (t *pageTracker) onBindingCalled(ev cdp.Event) {
 		t.mu.Unlock()
 		return
 	}
-	// Defense in depth: the binding is registered for the isolated
-	// world only, and a report must come from that world's context.
-	// A call from the page's own main-world context is dropped.
-	if want, ok := t.contexts[targetID]; ok && want != 0 && p.ExecutionContextID != want {
+	// Fail closed: the binding is registered globally, so a
+	// report is trusted only when its execution context is a
+	// recorded isolated-world context of this session. The
+	// page's own main-world context — and any context never
+	// reported for this session — is dropped silently for the
+	// user but noted in the run log for diagnosis.
+	if !t.isoCtx[ev.SessionID][p.ExecutionContextID] {
 		t.mu.Unlock()
+		if t.log != nil {
+			t.log.Warn("同步上报来自未知执行环境，已丢弃",
+				"session", shortSessionID(ev.SessionID))
+		}
 		return
 	}
 	if pageEv.Kind == "visibility" {
@@ -438,4 +475,14 @@ func (t *pageTracker) onBindingCalled(ev cdp.Event) {
 	if t.onEvent != nil {
 		t.onEvent(targetID, pageEv)
 	}
+}
+
+// shortSessionID keeps only a short opaque prefix of a CDP
+// session ID for log lines; session IDs carry no URL or page
+// content, and the prefix is enough to correlate entries.
+func shortSessionID(sid string) string {
+	if len(sid) > 8 {
+		return sid[:8]
+	}
+	return sid
 }

@@ -1,10 +1,39 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 
 /**
- * 弹窗统一行为：Esc 关闭、Tab 焦点循环、打开时聚焦首个元素
- * （或带 data-autofocus 的元素）、关闭后把焦点还给触发元素。
- * 输入框内按 Enter 触发 onSubmit；文本域和按钮不拦截。
+ * 弹窗统一行为：仅栈顶弹窗响应 Esc、Tab 焦点循环、打开时聚焦
+ * 首个元素（或带 data-autofocus 的元素）、关闭后把焦点还给
+ * 触发元素。
+ * 输入框内按 Enter 触发 onSubmit；文本域、按钮、下拉框与带
+ * data-no-submit 标记的输入框不触发提交。
  */
+// 顶层栈：记录当前打开的弹窗与弹出层，按打开顺序排列；
+// Esc 只由栈顶的层响应，避免一次 Esc 关掉多层弹窗。
+const layerStack: object[] = [];
+
+/**
+ * 把一个弹出层（弹窗或下拉菜单）注册到顶层栈；返回判断
+ * 本层是否为栈顶的函数。打开顺序即栈顺序：后打开的层在
+ * 栈顶，先响应 Esc；关闭时从栈中移除。
+ */
+export function useTopLayer(active: boolean): () => boolean {
+  const entryRef = useRef<object | null>(null);
+  if (entryRef.current === null) entryRef.current = {};
+  useEffect(() => {
+    if (!active) return;
+    const entry = entryRef.current as object;
+    layerStack.push(entry);
+    return () => {
+      const i = layerStack.indexOf(entry);
+      if (i >= 0) layerStack.splice(i, 1);
+    };
+  }, [active]);
+  return useCallback(
+    () => layerStack.length > 0 && layerStack[layerStack.length - 1] === entryRef.current,
+    [],
+  );
+}
+
 export function useDialogBehavior(
   open: boolean,
   containerRef: { current: HTMLElement | null },
@@ -18,6 +47,8 @@ export function useDialogBehavior(
   closeRef.current = onClose;
   const submitRef = useRef(onSubmit);
   submitRef.current = onSubmit;
+  // 本弹窗是否为顶层栈的栈顶；Esc 只由栈顶响应。
+  const isTopLayer = useTopLayer(open);
 
   useEffect(() => {
     if (!open) return;
@@ -39,6 +70,9 @@ export function useDialogBehavior(
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // 只有栈顶的弹窗响应 Esc；下层弹窗等上层关闭后
+        // 再响应，避免一次 Esc 关掉多层弹窗、丢掉输入。
+        if (!isTopLayer()) return;
         e.preventDefault();
         closeRef.current();
         return;
@@ -46,7 +80,20 @@ export function useDialogBehavior(
       if (e.key === "Enter" && submitRef.current) {
         const target = e.target as HTMLElement | null;
         const tag = target?.tagName;
-        if (tag !== "TEXTAREA" && tag !== "BUTTON" && tag !== "A") {
+        // 下拉框的 Enter 用于打开选项，不应提交；带
+        // data-no-submit 的输入框（如节点选择器的搜索框）
+        // 同样不触发提交。
+        const noSubmit =
+          target && typeof target.closest === "function"
+            ? target.closest("[data-no-submit]")
+            : null;
+        if (
+          tag !== "TEXTAREA" &&
+          tag !== "BUTTON" &&
+          tag !== "A" &&
+          tag !== "SELECT" &&
+          !noSubmit
+        ) {
           e.preventDefault();
           submitRef.current();
         }
