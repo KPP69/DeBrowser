@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import { DialogLayer } from "../components/Modal";
 import { Activity, Database, Timer } from "lucide-react";
 import {
-  DiagnosticsService,
-  type DiagnosticsView,
+  DataService,
+  type DataView,
   type ExportResult,
   type LogExportInfo,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { useAppStore } from "../stores/useAppStore";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 
@@ -55,7 +57,7 @@ function formatUptime(totalSeconds: number): string {
  */
 export default function DataManagementPage() {
   const status = useAppStore((state) => state.status);
-  const [view, setView] = useState<DiagnosticsView | null>(null);
+  const [view, setView] = useState<DataView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   // 记录导出对话框（类别 + 动态日期范围）。
@@ -72,7 +74,7 @@ export default function DataManagementPage() {
   const [capSaving, setCapSaving] = useState(false);
 
   const refresh = useCallback(() => {
-    DiagnosticsService.GetDiagnostics()
+    DataService.GetDataView()
       .then((v) => {
         setView(v);
         setLoadError(null);
@@ -86,6 +88,11 @@ export default function DataManagementPage() {
       });
   }, []);
 
+  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
+  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
+  usePageRefresh("datamanagement", refresh);
+
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -98,7 +105,7 @@ export default function DataManagementPage() {
     setExportStart("");
     setExportEnd("");
     setDialogError(null);
-    DiagnosticsService.GetLogExportInfo(category)
+    DataService.GetLogExportInfo(category)
       .then((info) => {
         setExportInfo(info);
         if (info.hasRecords) {
@@ -118,7 +125,7 @@ export default function DataManagementPage() {
     setExporting(true);
     setDialogError(null);
     const opId = newOperationId();
-    DiagnosticsService.ExportRecords(opId, category, exportStart, exportEnd)
+    DataService.ExportRecords(opId, category, exportStart, exportEnd)
       .then((res: ExportResult) => {
         if (res.cancelled) {
           // 用户主动取消保存对话框：静默关闭，不通知、
@@ -169,7 +176,7 @@ export default function DataManagementPage() {
     setCapSaving(true);
     setCapError(null);
     const opId = newOperationId();
-    DiagnosticsService.SetLogCapacity(opId, bytes)
+    DataService.SetLogCapacity(opId, bytes)
       .then(() => {
         const msg = `日志容量已设置为 ${formatCapacity(bytes)}。`;
         notifySuccess(msg, { operationId: opId, important: true });
@@ -302,7 +309,7 @@ export default function DataManagementPage() {
             <span className="w-20 shrink-0">存储容量</span>
             <span className="min-w-0 flex-1">
               {view
-                ? `${formatCapacity(view.logCapacityLimitBytes)} / ${formatCapacity(view.logRemainingBytes)}`
+                ? `上限 ${formatCapacity(view.logCapacityLimitBytes)} · 已用 ${formatBytes(view.logUsedBytes)}`
                 : "加载中…"}
             </span>
             <button
@@ -325,7 +332,7 @@ export default function DataManagementPage() {
       </section>
 
       {exportDialog && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <DialogLayer open onClose={() => setExportDialog(null)} onSubmit={confirmRecordsExport}>
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">
               导出{RECORD_ROWS.find((r) => r.key === exportDialog)?.label}
@@ -388,11 +395,11 @@ export default function DataManagementPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       {capacityDialog && view && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
+        <DialogLayer open onClose={() => setCapacityDialog(false)} onSubmit={confirmCapacity}>
           <div className="w-full max-w-md rounded-xl border border-(--border) bg-(--panel-bg) p-5 shadow-xl">
             <h3 className="text-base font-semibold">日志存储容量</h3>
             <div className="mt-3 space-y-1 text-sm text-(--text-dim)">
@@ -467,7 +474,7 @@ export default function DataManagementPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );

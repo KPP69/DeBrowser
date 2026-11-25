@@ -8,6 +8,8 @@ import {
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
 import { notifyError, notifySuccess } from "../stores/useNotificationStore";
+import { useAppStore } from "../stores/useAppStore";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 import {
   canStart,
   phaseControls,
@@ -19,9 +21,10 @@ import {
  * 多开同步（Stage 10）：选择一个主实例与若干跟随实例，将主
  * 实例的网页操作（经 CDP）、已确认的导航与窗口状态同步到
  * 跟随实例。页面顶部功能栏集中全部操作，下方为参与实例
- * 状态与能力说明，不读取或显示任何网页内容。
+ * 状态与使用说明，不读取或显示任何网页内容。
  */
 export default function SyncPage() {
+  const appPage = useAppStore((state) => state.page);
   const [candidates, setCandidates] = useState<SyncCandidate[]>([]);
   const [state, setState] = useState<SyncStateView | null>(null);
   const [monitors, setMonitors] = useState<SyncMonitor[]>([]);
@@ -76,7 +79,7 @@ export default function SyncPage() {
     }
   }, []);
 
-  // 显示器列表只在页面挂载时读取一次（不是轮询）；
+  // 显示器列表在挂载与切回本页时读取（不是轮询）；
   // 加载失败时通过全局通知显示真实原因，不静默吞掉，
   // 并保留失败原因供页面区分读取失败与真实空列表。
   const loadMonitors = useCallback(() => {
@@ -85,8 +88,13 @@ export default function SyncPage() {
         const list = ms ?? [];
         setMonitors(list);
         setMonitorsError(null);
-        const primary = list.find((m) => m.primary);
-        if (primary) setMonitorId(primary.id);
+        // 切回页面只刷新列表，不动用户已选的显示器：只有
+        // 当前选择不在新列表中时才回落到主显示器。首次加载
+        // 时 monitorId 为初始值 0，同样走该分支。
+        setMonitorId((cur) => {
+          if (list.some((m) => m.id === cur)) return cur;
+          return list.find((m) => m.primary)?.id ?? cur;
+        });
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -98,9 +106,20 @@ export default function SyncPage() {
   useEffect(() => {
     void refresh();
     loadMonitors();
+  }, [refresh, loadMonitors]);
+
+  // 显示器列表只在挂载时读过一次：切回本页时重新枚举一次，
+  // 以便接上/拔掉显示器后列表及时更新（首次挂载由上方
+  // 加载逻辑负责）。轮询仍只刷新同步状态，不碰显示器列表。
+  usePageRefresh("sync", loadMonitors);
+
+  // 页面隐藏时停止轮询：保活后所有页面常驻，后台页面不应继续抢 IPC。
+  useEffect(() => {
+    if (appPage !== "sync") return;
+    void refresh();
     const t = setInterval(() => void refresh(), 2500);
     return () => clearInterval(t);
-  }, [refresh, loadMonitors]);
+  }, [refresh, appPage]);
 
   const run = async (
     action: string,
@@ -315,12 +334,11 @@ export default function SyncPage() {
       </section>
 
       <section className="rounded-xl border border-(--border) bg-(--panel-bg) p-4 text-sm leading-relaxed text-(--text-dim)">
-        <h2 className="mb-2 text-sm font-medium text-(--text-main)">能力说明</h2>
+        <h2 className="mb-2 text-sm font-medium text-(--text-main)">使用说明</h2>
         <ul className="list-disc space-y-1 pl-5">
-          <li>可靠支持：页面点击、移动、滚动、拖动、键盘与文本输入（含中文输入法最终文本）、新建/关闭/切换标签、页面导航与刷新。</li>
-          <li>条件支持：前进/后退取决于各实例自身的浏览历史；扩展弹窗与个别原生控件无法保证识别，不做猜测性操作。</li>
-          <li>不支持：浏览器原生界面文字的逐字同步（地址栏未提交文字等）、剪贴板同步、页面缩放同步、最小化状态同步、跨域 iframe 内的操作。</li>
-          <li>同步不移动系统鼠标、不抢占前台焦点；不记录网页内容、输入文本与浏览历史。</li>
+          <li>选一个主控，勾选跟随实例</li>
+          <li>先点「排列窗口」，后点「开始同步」</li>
+          <li>同步期间窗口重叠，同步暂停，再点「排列窗口」即可恢复</li>
         </ul>
       </section>
       </div>

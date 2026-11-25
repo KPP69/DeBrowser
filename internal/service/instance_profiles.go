@@ -97,7 +97,8 @@ func (s *InstanceService) diskProfileFolders() (map[string]string, error) {
 			continue
 		}
 		info, err := e.Info()
-		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 ||
+			isReparsePoint(filepath.Join(s.layout.Profiles, name)) {
 			continue
 		}
 		out[foldName(name)] = name

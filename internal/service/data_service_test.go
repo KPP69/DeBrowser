@@ -11,14 +11,14 @@ import (
 	"github.com/KPP69/DeBrowser/internal/paths"
 )
 
-type diagFixture struct {
-	svc    *DiagnosticsService
+type dataFixture struct {
+	svc    *DataService
 	layout paths.Layout
 	logs   *logging.System
 	db     *database.DB
 }
 
-func newDiagFixture(t *testing.T) diagFixture {
+func newDiagFixture(t *testing.T) dataFixture {
 	t.Helper()
 	layout, err := paths.Resolve(t.TempDir())
 	if err != nil {
@@ -43,7 +43,7 @@ func newDiagFixture(t *testing.T) diagFixture {
 	if err != nil {
 		t.Fatalf("NewAppService: %v", err)
 	}
-	f := diagFixture{svc: NewDiagnosticsService(db, logs, appSvc), layout: layout, logs: logs, db: db}
+	f := dataFixture{svc: NewDataService(db, logs, appSvc), layout: layout, logs: logs, db: db}
 	t.Cleanup(func() {
 		_ = logs.Close()
 		_ = db.Close()
@@ -51,12 +51,12 @@ func newDiagFixture(t *testing.T) diagFixture {
 	return f
 }
 
-func TestGetDiagnostics(t *testing.T) {
+func TestGetDataView(t *testing.T) {
 	f := newDiagFixture(t)
 	f.logs.Logger().Info("hello")
-	view, err := f.svc.GetDiagnostics()
+	view, err := f.svc.GetDataView()
 	if err != nil {
-		t.Fatalf("GetDiagnostics: %v", err)
+		t.Fatalf("GetDataView: %v", err)
 	}
 	if view.AppVersion == "" || view.SchemaVersion != 15 {
 		t.Fatalf("view = %+v, want version set and schema 11", view)

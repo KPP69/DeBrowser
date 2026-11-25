@@ -83,7 +83,7 @@ func Acquire(lockFile string) (*Lock, error) {
 		return nil, fmt.Errorf("singleinstance: lock file: %w", err)
 	}
 	pid := os.Getpid()
-	// Record our PID for diagnostics (best effort: ownership is the
+	// Record our PID for the data page (best effort: ownership is the
 	// OS lock, never this content).
 	_ = f.Truncate(0)
 	_, _ = f.WriteAt([]byte(fmt.Sprintf("%d\n%d\n", pid, time.Now().UnixNano())), 0)

@@ -1,16 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Bookmark,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  Loader2,
-  Pencil,
-  Plus,
-  Search,
-  Send,
-  Trash2,
-} from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import {
   BookmarkService,
   InstanceService,
@@ -28,15 +17,18 @@ import {
   siblingIds,
   syncEntryDecision,
   visibleRows,
-  type VisibleRow,
 } from "./bookmarksLogic";
 import SyncDialog from "./BookmarksPageSync";
+import BookmarkTree from "../components/bookmarks/BookmarkTree";
+import { CreateBookmarkDialog, EditBookmarkDialog } from "../components/bookmarks/BookmarkDialogs";
+import BookmarksToolbar from "../components/bookmarks/BookmarksToolbar";
+import BookmarkInstanceList from "../components/bookmarks/BookmarkInstanceList";
+import SyncGateDialog from "../components/bookmarks/SyncGateDialog";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
-
-type DialogTab = "bookmark" | "folder";
 
 // 书签管理：左侧是 DeBrowser 自己的书签资源库（数据库），右侧是
 // 实例列表（仅名称、书签数量与选择框）。资源库与各实例 Profile
@@ -58,7 +50,7 @@ export default function BookmarksPage() {
   const [instQuery, setInstQuery] = useState("");
   const [instSelected, setInstSelected] = useState<ReadonlySet<string>>(new Set());
 
-  const [createTab, setCreateTab] = useState<DialogTab | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [editNode, setEditNode] = useState<BookmarkNode | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -177,6 +169,11 @@ export default function BookmarksPage() {
     }
   }, []);
 
+  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
+  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
+  usePageRefresh("bookmarks", reload);
+
+
   useEffect(() => {
     void reload((message) => notifyError("加载书签失败：" + message));
   }, [reload]);
@@ -238,6 +235,26 @@ export default function BookmarksPage() {
     });
   };
 
+  const toggleInstSelect = (id: string) => {
+    setInstSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleInstSelectAll = (checked: boolean) => {
+    setInstSelected((prev) => {
+      const next = new Set(prev);
+      for (const i of filteredInstances) {
+        if (checked) next.add(i.id);
+        else next.delete(i.id);
+      }
+      return next;
+    });
+  };
+
   // ---- drag & drop: reorder within a level, or move into a folder ----
   const onDropRow = async (
     target: { id: string; kind: string; name: string; parentId?: string | null },
@@ -291,70 +308,19 @@ export default function BookmarksPage() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4">
       {/* 顶部工具栏 */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
-          disabled={busy !== null}
-          onClick={() => setCreateTab("bookmark")}
-        >
-          <Plus size={15} /> 新建
-        </button>
-        <button
-          type="button"
-          className={
-            "flex items-center gap-1 rounded-md px-3 py-1.5 text-sm disabled:opacity-50 " +
-            (editMode ? "bg-(--accent) text-white" : "bg-(--hover-bg) text-(--text-main)")
-          }
-          disabled={busy !== null}
-          onClick={() => setEditMode((v) => !v)}
-        >
-          <Pencil size={15} /> 编辑
-        </button>
-        {!deleteArmed ? (
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm text-(--text-main) disabled:opacity-50"
-            disabled={busy !== null || selected.size === 0}
-            onClick={() => setDeleteArmed(true)}
-          >
-            <Trash2 size={15} /> 删除所选
-          </button>
-        ) : (
-          <>
-            {scope.folders > 0 && (
-              <span className="text-xs text-(--danger)">所选包含文件夹，其内容将一并删除</span>
-            )}
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded-md bg-(--danger) px-3 py-1.5 text-sm text-white disabled:opacity-50"
-              disabled={busy !== null}
-              onClick={() => void doDelete()}
-            >
-              确定删除
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm text-(--text-main) disabled:opacity-50"
-              disabled={busy !== null}
-              onClick={() => setDeleteArmed(false)}
-            >
-              取消
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm text-(--text-main) disabled:opacity-50"
-          disabled={busy !== null}
-          onClick={() => void handleSyncClick()}
-        >
-          <Send size={15} /> 同步
-        </button>
-        <span className="ml-auto text-xs text-(--text-faint)">
-          资源库与实例书签相互独立，互不自动覆盖
-        </span>
-      </div>
+      <BookmarksToolbar
+        editMode={editMode}
+        busy={busy !== null}
+        selectedCount={selected.size}
+        scope={scope}
+        deleteArmed={deleteArmed}
+        onNew={() => setCreateOpen(true)}
+        onToggleEditMode={() => setEditMode((v) => !v)}
+        onArmDelete={() => setDeleteArmed(true)}
+        onConfirmDelete={() => void doDelete()}
+        onCancelDelete={() => setDeleteArmed(false)}
+        onSyncClick={() => void handleSyncClick()}
+      />
 
       {/* 主体：左右两区独立滚动 */}
       <div className="flex min-h-0 flex-1 gap-3">
@@ -392,101 +358,45 @@ export default function BookmarksPage() {
                 {nodes.length === 0 ? "资源库为空，点击「新建」添加书签或文件夹。" : "没有匹配的书签。"}
               </p>
             ) : (
-              rows.map((row) => (
-                <LibraryRow
-                  key={row.node.id}
-                  row={row}
-                  checked={selected.has(row.node.id)}
-                  collapsed={collapsed.has(row.node.id)}
-                  editMode={editMode}
-                  busy={busy !== null}
-                  onToggleSelect={() => toggleSelect(row.node.id)}
-                  onToggleCollapse={() => toggleCollapse(row.node.id)}
-                  onEdit={() => {
-                    const full = nodes.find((n) => n.id === row.node.id);
-                    if (full) setEditNode(full);
-                  }}
-                  onDragStart={() => setDragId(row.node.id)}
-                  onDrop={(pos) => void onDropRow(row.node, pos)}
-                />
-              ))
+              <BookmarkTree
+                rows={rows}
+                selected={selected}
+                collapsed={collapsed}
+                editMode={editMode}
+                busy={busy !== null}
+                onToggleSelect={toggleSelect}
+                onToggleCollapse={toggleCollapse}
+                onEdit={(id) => {
+                  const full = nodes.find((n) => n.id === id);
+                  if (full) setEditNode(full);
+                }}
+                onDragStart={setDragId}
+                onDrop={(target, pos) => void onDropRow(target, pos)}
+              />
             )}
           </div>
         </section>
 
-        <section className="flex w-72 shrink-0 flex-col rounded-lg border border-(--border) bg-(--panel-bg)">
-          <header className="flex items-center gap-2 border-b border-(--border) px-3 py-2">
-            <h3 className="text-sm font-semibold">实例列表</h3>
-            <label className="ml-auto flex items-center gap-1 rounded-md bg-(--hover-bg) px-2 py-1">
-              <Search size={13} className="text-(--text-faint)" />
-              <input
-                className="w-24 bg-transparent text-xs outline-none"
-                placeholder="搜索实例"
-                value={instQuery}
-                onChange={(e) => setInstQuery(e.target.value)}
-              />
-            </label>
-          </header>
-          <label className="flex items-center gap-2 border-b border-(--border) px-3 py-1.5 text-xs text-(--text-faint)">
-            <input
-              type="checkbox"
-              checked={filteredInstances.length > 0 && filteredInstances.every((i) => instSelected.has(i.id))}
-              onChange={(e) => {
-                setInstSelected((prev) => {
-                  const next = new Set(prev);
-                  for (const i of filteredInstances) {
-                    if (e.target.checked) next.add(i.id);
-                    else next.delete(i.id);
-                  }
-                  return next;
-                });
-              }}
-            />
-            全选（当前显示 {filteredInstances.length} 个）
-          </label>
-          <div className="min-h-0 flex-1 overflow-y-auto p-1">
-            {filteredInstances.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-(--text-faint)">没有实例。</p>
-            ) : (
-              filteredInstances.map((inst) => (
-                <label
-                  key={inst.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-(--hover-bg)"
-                >
-                  <input
-                    type="checkbox"
-                    checked={instSelected.has(inst.id)}
-                    onChange={() => {
-                      setInstSelected((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(inst.id)) next.delete(inst.id);
-                        else next.add(inst.id);
-                        return next;
-                      });
-                    }}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{inst.name}</span>
-                  <span className="text-xs text-(--text-faint)">
-                    {inst.bookmarkCount >= 0 ? inst.bookmarkCount + " 个书签" : "书签数未知"}
-                  </span>
-                </label>
-              ))
-            )}
-          </div>
-        </section>
+        <BookmarkInstanceList
+          filteredInstances={filteredInstances}
+          instSelected={instSelected}
+          instQuery={instQuery}
+          busy={busy !== null}
+          onInstQueryChange={setInstQuery}
+          onToggleInstSelect={toggleInstSelect}
+          onToggleInstSelectAll={toggleInstSelectAll}
+        />
       </div>
 
-      {createTab && (
-        <CreateDialog
-          tab={createTab}
+      {createOpen && (
+        <CreateBookmarkDialog
           folders={folders}
           busy={busy !== null}
-          onTab={setCreateTab}
-          onClose={() => setCreateTab(null)}
+          onClose={() => setCreateOpen(false)}
           onSubmit={async (input) => {
             await run("create", "新建书签资源", async (opId) => {
               await BookmarkService.CreateLibraryNode(opId, input);
-              setCreateTab(null);
+              setCreateOpen(false);
               await reload();
               return input.kind === "folder" ? "文件夹已创建" : "书签已创建";
             });
@@ -495,7 +405,7 @@ export default function BookmarksPage() {
       )}
 
       {editNode && (
-        <EditDialog
+        <EditBookmarkDialog
           node={editNode}
           folders={folders.filter((f) => f.id !== editNode.id)}
           busy={busy !== null}
@@ -512,47 +422,15 @@ export default function BookmarksPage() {
       )}
 
       {syncGate !== "idle" && (
-        <div
-          className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4"
-          onClick={() => {
-            // 点击窗口外区域等同于取消（关闭处理中不允许取消）。
+        <SyncGateDialog
+          gate={syncGate}
+          busy={busy !== null}
+          onClose={() => {
+            // 关闭处理中不允许取消。
             if (syncGate === "confirm") setSyncGate("idle");
           }}
-        >
-          <div
-            className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-semibold">同步前关闭实例</h3>
-            {syncGate === "closing" ? (
-              <p className="mt-2 flex items-center gap-2 text-sm text-(--text-dim)">
-                <Loader2 size={15} className="animate-spin" /> 正在关闭浏览器实例，请稍候……
-              </p>
-            ) : (
-              <>
-                <p className="mt-2 text-sm text-(--text-dim)">
-                  检测到仍有浏览器实例正在运行，书签同步前需要先关闭所有浏览器实例。
-                </p>
-                <div className="mt-4 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white"
-                    onClick={() => void closeInstancesThenSync()}
-                  >
-                    关闭实例
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm"
-                    onClick={() => setSyncGate("idle")}
-                  >
-                    取消
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+          onConfirm={() => void closeInstancesThenSync()}
+        />
       )}
 
       {syncOpen && (
@@ -565,236 +443,6 @@ export default function BookmarksPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function LibraryRow(props: {
-  row: VisibleRow;
-  checked: boolean;
-  collapsed: boolean;
-  editMode: boolean;
-  busy: boolean;
-  onToggleSelect: () => void;
-  onToggleCollapse: () => void;
-  onEdit: () => void;
-  onDragStart: () => void;
-  onDrop: (pos: "before" | "into" | "after") => void;
-}) {
-  const { row } = props;
-  const node = row.node;
-  const isFolder = node.kind === "folder";
-  return (
-    <div
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm hover:bg-(--hover-bg)"
-      style={{ paddingLeft: 6 + row.depth * 18 }}
-      draggable
-      onDragStart={props.onDragStart}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-        const ratio = (e.clientY - rect.top) / rect.height;
-        props.onDrop(isFolder && ratio > 0.3 && ratio < 0.7 ? "into" : ratio <= 0.5 ? "before" : "after");
-      }}
-    >
-      {isFolder ? (
-        <button type="button" className="shrink-0 text-(--text-faint)" onClick={props.onToggleCollapse}>
-          {props.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        </button>
-      ) : (
-        <span className="w-3.5 shrink-0" />
-      )}
-      <input type="checkbox" checked={props.checked} onChange={props.onToggleSelect} />
-      {isFolder ? (
-        <Folder size={15} className="shrink-0 text-(--accent)" />
-      ) : (
-        <Bookmark size={15} className="shrink-0 text-(--text-faint)" />
-      )}
-      <span className="min-w-0 flex-1 truncate">
-        {node.name}
-        {!isFolder && <span className="ml-2 truncate text-xs text-(--text-faint)">{node.url}</span>}
-      </span>
-      {props.editMode && (
-        <button
-          type="button"
-          className="shrink-0 rounded px-1.5 py-0.5 text-xs text-(--accent) hover:bg-(--panel-bg)"
-          disabled={props.busy}
-          onClick={props.onEdit}
-        >
-          编辑
-        </button>
-      )}
-    </div>
-  );
-}
-
-function FolderSelect(props: {
-  folders: { id: string; name: string; depth: number }[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  return (
-    <select
-      className="w-full rounded-md border border-(--border) bg-(--input-bg) px-2 py-1.5 text-sm"
-      value={props.value}
-      onChange={(e) => props.onChange(e.target.value)}
-    >
-      <option value="">根目录</option>
-      {props.folders.map((f) => (
-        <option key={f.id} value={f.id}>
-          {"　".repeat(f.depth)}
-          {f.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function CreateDialog(props: {
-  tab: DialogTab;
-  folders: { id: string; name: string; depth: number }[];
-  busy: boolean;
-  onTab: (t: DialogTab) => void;
-  onClose: () => void;
-  onSubmit: (input: { kind: string; name: string; url: string; parentId: string | null }) => Promise<void>;
-}) {
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
-  const [parentId, setParentId] = useState("");
-  const isBookmark = props.tab === "bookmark";
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold">新建</h3>
-          <div className="ml-auto flex rounded-md bg-(--hover-bg) p-0.5">
-            {(["bookmark", "folder"] as DialogTab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={
-                  "rounded px-3 py-1 text-sm " + (props.tab === t ? "bg-(--accent) text-white" : "text-(--text-main)")
-                }
-                onClick={() => props.onTab(t)}
-              >
-                {t === "bookmark" ? "书签" : "文件夹"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-3 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            名称
-            <input
-              className="rounded-md border border-(--border) bg-(--input-bg) px-2 py-1.5"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={isBookmark ? "书签名称" : "文件夹名称"}
-            />
-          </label>
-          {isBookmark && (
-            <label className="flex flex-col gap-1 text-sm">
-              网址
-              <input
-                className="rounded-md border border-(--border) bg-(--input-bg) px-2 py-1.5"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com/"
-              />
-            </label>
-          )}
-          <label className="flex flex-col gap-1 text-sm">
-            {isBookmark ? "文件夹（可选）" : "上级文件夹"}
-            <FolderSelect folders={props.folders} value={parentId} onChange={setParentId} />
-          </label>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm" onClick={props.onClose}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            disabled={props.busy}
-            onClick={() =>
-              void props.onSubmit({
-                kind: props.tab,
-                name,
-                url: isBookmark ? url : "",
-                parentId: parentId === "" ? null : parentId,
-              })
-            }
-          >
-            保存
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditDialog(props: {
-  node: BookmarkNode;
-  folders: { id: string; name: string; depth: number }[];
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (input: { id: string; name: string; url: string; parentId: string | null }) => Promise<void>;
-}) {
-  const [name, setName] = useState(props.node.name);
-  const [url, setUrl] = useState(props.node.url);
-  const [parentId, setParentId] = useState(props.node.parentId ?? "");
-  const isBookmark = props.node.kind === "bookmark";
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-lg bg-(--panel-bg) p-4 shadow-xl">
-        <h3 className="text-base font-semibold">编辑{isBookmark ? "书签" : "文件夹"}</h3>
-        <div className="mt-3 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            名称
-            <input
-              className="rounded-md border border-(--border) bg-(--input-bg) px-2 py-1.5"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          {isBookmark && (
-            <label className="flex flex-col gap-1 text-sm">
-              网址
-              <input
-                className="rounded-md border border-(--border) bg-(--input-bg) px-2 py-1.5"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </label>
-          )}
-          <label className="flex flex-col gap-1 text-sm">
-            所属文件夹
-            <FolderSelect folders={props.folders} value={parentId} onChange={setParentId} />
-          </label>
-          <p className="text-xs text-(--text-faint)">编辑只修改资源库，不会修改已同步到实例中的书签。</p>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded-md bg-(--hover-bg) px-3 py-1.5 text-sm" onClick={props.onClose}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-(--accent) px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            disabled={props.busy}
-            onClick={() =>
-              void props.onSubmit({
-                id: props.node.id,
-                name,
-                url: isBookmark ? url : "",
-                parentId: parentId === "" ? null : parentId,
-              })
-            }
-          >
-            保存
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

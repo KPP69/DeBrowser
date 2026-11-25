@@ -469,7 +469,10 @@ func (s *BookmarkService) syncBookmarks(nodeIDs []string, instanceIDs []string) 
 }
 
 func (s *BookmarkService) syncToInstance(instanceID string, tops []model.BookmarkNode, children map[string][]model.BookmarkNode) SyncInstanceResult {
-	inst, dir, gate, err := s.instances.InstanceBookmarkAccess(instanceID)
+	unlock, inst, dir, gate, err := s.instances.lockBookmarkAccess(instanceID)
+	if unlock != nil {
+		defer unlock()
+	}
 	res := SyncInstanceResult{InstanceID: instanceID, InstanceName: inst.Name}
 	if err != nil {
 		res.Status = "failed"
@@ -493,8 +496,8 @@ func (s *BookmarkService) syncToInstance(instanceID string, tops []model.Bookmar
 		res.Reason = "无法确定该实例实际的书签目录（浏览器配置无效）"
 		return res
 	}
-	unlock := chromebookmarks.LockProfile(pdir)
-	defer unlock()
+	profileUnlock := chromebookmarks.LockProfile(pdir)
+	defer profileUnlock()
 	loaded, err := chromebookmarks.LoadOrEmpty(pdir)
 	if err != nil {
 		res.Status = "failed"

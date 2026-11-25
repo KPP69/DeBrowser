@@ -40,11 +40,19 @@ func (s *InstanceService) InstanceBookmarkAccess(id string) (model.Instance, str
 	dir := filepath.Join(s.layout.Data, filepath.FromSlash(inst.UserDataDir))
 	switch s.effectiveStatus(inst) {
 	case model.StatusStopped:
+		if profileLocked(dir) {
+			// Untracked browser still owns the profile (self
+			// restart/update): treat it as unconfirmable.
+			return inst, dir, BookmarkGateUnknown, nil
+		}
 		return inst, dir, BookmarkGateStopped, nil
 	case model.StatusRunning, model.StatusStarting, model.StatusStopping:
 		return inst, dir, BookmarkGateRunning, nil
 	case model.StatusError:
 		if _, rerr := s.store.GetInstanceRuntime(c, id); errors.Is(rerr, store.ErrNotFound) {
+			if profileLocked(dir) {
+				return inst, dir, BookmarkGateUnknown, nil
+			}
 			return inst, dir, BookmarkGateStopped, nil
 		}
 		return inst, dir, BookmarkGateUnknown, nil

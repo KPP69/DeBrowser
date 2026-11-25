@@ -64,7 +64,7 @@ type System struct {
 // NewSystem creates the three category writers under the layout's
 // logs directory and builds the application logger. Retention and
 // capacity enforcement run during creation; a cleanup failure is
-// recorded for diagnostics and never fails startup.
+// recorded for the data page and never fails startup.
 func NewSystem(cfg config.Config) (*System, error) {
 	dir := cfg.Layout.Logs
 	s := &System{dir: dir, writers: make(map[Category]*categoryWriter)}
@@ -80,11 +80,13 @@ func NewSystem(cfg config.Config) (*System, error) {
 	}
 	// Global capacity: default until the app applies the user's
 	// persisted setting; writers nudge enforcement as they write.
+	// No enforcement runs here: the user's setting is applied by
+	// main once AppService has loaded it, so a short session must
+	// not trim logs against the 100 MB default first.
 	atomic.StoreInt64(&s.capacityLimit, DefaultCapacityBytes)
 	for _, w := range s.writers {
 		w.onThreshold = s.enforceThrottled
 	}
-	_ = s.EnforceCapacity()
 
 	level := ParseLevel(cfg.LogLevel)
 	opts := &slog.HandlerOptions{Level: level, ReplaceAttr: renameAttr}
@@ -148,7 +150,7 @@ func (s *System) Audit(e AuditEvent) {
 }
 
 // CategoryStats is a point-in-time view of one category for the
-// diagnostics page and exports.
+// data page and log export.
 type CategoryStats struct {
 	Category      Category
 	Files         int
@@ -179,7 +181,7 @@ func (s *System) Stats() []CategoryStats {
 	return out
 }
 
-// LogFile describes one log file for diagnostic export.
+// LogFile describes one log file for the log export.
 type LogFile struct {
 	Category Category
 	Name     string // base name

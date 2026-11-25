@@ -1,23 +1,5 @@
 package service
 
-import (
-	"context"
-	"errors"
-	"fmt"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/KPP69/DeBrowser/internal/logging"
-	"github.com/KPP69/DeBrowser/internal/model"
-	"github.com/KPP69/DeBrowser/internal/runner"
-	"github.com/KPP69/DeBrowser/internal/store"
-)
-
 // Stage 9B runtime management. The rules that keep this safe:
 //
 //   - DeBrowser manages only the browser processes it launched
@@ -43,36 +25,25 @@ import (
 //     are independent OS processes, and their runtime records let
 //     the next DeBrowser start re-identify the ones still alive.
 
+import (
+	"errors"
+	"fmt"
+	"github.com/KPP69/DeBrowser/internal/logging"
+	"github.com/KPP69/DeBrowser/internal/model"
+	"github.com/KPP69/DeBrowser/internal/runner"
+	"github.com/KPP69/DeBrowser/internal/store"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+)
+
 // abortCloseTimeout bounds the graceful close asked of a
 // just-launched process whose verification failed. A variable
 // so tests can shorten it.
 var abortCloseTimeout = 3 * time.Second
-
-// processExited reports whether the tracked process's exit has
-// already been observed on its own exit channel — the only
-// proof of exit the abort path accepts.
-func processExited(p runner.Process) bool {
-	select {
-	case <-p.Exited():
-		return true
-	default:
-		return false
-	}
-}
-
-// confirmChildExited reports whether the exact process is
-// confirmed exited, asking it to close gracefully first if it
-// is still running. A close error racing a real exit still
-// counts as an exit; a sent close request alone never does.
-func confirmChildExited(proc runner.Process) bool {
-	if processExited(proc) {
-		return true
-	}
-	if err := proc.CloseGracefully(abortCloseTimeout); err == nil {
-		return true
-	}
-	return processExited(proc)
-}
 
 // startSettleDelay is how long a freshly launched process must
 // survive before the launch counts as successful (a field so
@@ -89,433 +60,6 @@ var closeTimeout = 20 * time.Second
 // its (local) cleanup. A variable so tests can shorten it.
 var stopConfirmTimeout = 2 * time.Second
 
-// watchSettleHook, when set (tests only), runs inside the
-// watcher's persisted cleanup after the exit has been observed
-// and the restart guard established, before the database is
-// settled. It lets tests hold the cleanup window open
-// deterministically instead of racing it with sleeps.
-var watchSettleHook func(instanceID string)
-
-// procWatch is the lifecycle handle for one adopted browser
-// process. Exactly one watcher goroutine (watchProcess) owns
-// the process's exit cleanup; done is closed when that cleanup
-// has run, so an operation that asked the process to close — a
-// stop, a failed start's cleanup — waits for the unified
-// outcome instead of cleaning up itself.
-type procWatch struct {
-	proc runner.Process
-	done chan struct{}
-	// cdpPort is the loopback Chrome DevTools Protocol port
-	// assigned by the launch flow for this process (Stage 10).
-	// Zero means the process has no DeBrowser-assigned CDP port
-	// (allocation failed at launch, or the process was re-adopted
-	// after a DeBrowser restart): such instances run normally
-	// but cannot join synchronization.
-	cdpPort int
-	// exited is set under rtMu by the watcher the moment it
-	// observes the exit, before any cleanup: a start operation
-	// that sees it knows the process is gone and must not
-	// persist a running state for it.
-	exited bool
-	// persisted reports whether a runtime record exists for
-	// this process (written by a verified start or an
-	// unconfirmed-exit hold, or present at re-attachment). Only
-	// then does the watcher settle the database on exit; before
-	// that, the start operation owns the outcome.
-	persisted bool
-	// stopAsked is set by a stop operation before it asks the
-	// process to close: an exit the user requested through
-	// DeBrowser is a normal exit for status purposes, whatever
-	// its code (a browser answering SIGTERM reports -1, not 0).
-	stopAsked bool
-}
-
-// reconcileEvent is one startup-reconciliation outcome, buffered
-// until the unified record is wired (see ReportReconciliation).
-type reconcileEvent struct {
-	instanceID string
-	action     string
-	status     string
-	detail     string
-}
-
-func (s *InstanceService) noteReconcile(instanceID, action, status, detail string) {
-	s.reconcileEvents = append(s.reconcileEvents, reconcileEvent{
-		instanceID: instanceID, action: action, status: status, detail: detail,
-	})
-}
-
-// ReportReconciliation flushes the startup runtime reconciliation
-// outcomes into the unified record. main calls it right after
-// wiring the Auditor (the reconciliation itself runs in the
-// constructor, before an Auditor can exist).
-func (s *InstanceService) ReportReconciliation() {
-	if s.Auditor == nil {
-		return
-	}
-	for _, ev := range s.reconcileEvents {
-		meta := map[string]string{"instance_id": ev.instanceID}
-		if ev.detail != "" {
-			meta["detail"] = ev.detail
-		}
-		s.Auditor.RecordRuntime("浏览器实例", ev.action, ev.status, meta)
-	}
-	s.reconcileEvents = nil
-}
-
-// reconcileRuntimeAtStartup brings persisted state in line with
-// live process facts, once, at service construction:
-//
-//   - instances persisted "running" with NO runtime record are
-//     pre-tracking leftovers: stopped (store.ReconcileInstance
-//     Statuses);
-//   - each runtime record is verified against the live process
-//     (see verifyRecordedProcess): verified processes are
-//     re-attached and watched; disproved records are removed and
-//     their instances stopped; processes that exist but cannot be
-//     confirmed are left recorded and their instances set to
-//     "unknown" — a safe hold, neither closed nor acted on.
-func (s *InstanceService) reconcileRuntimeAtStartup(c context.Context) error {
-	if n, err := s.store.ReconcileInstanceStatuses(c); err != nil {
-		return err
-	} else if n > 0 {
-		s.log.Info("reconciled stale running instances to stopped", "count", n)
-	}
-	records, err := s.store.ListInstanceRuntimes(c)
-	if err != nil {
-		return err
-	}
-	for _, rt := range records {
-		s.reconcileOne(c, rt)
-	}
-	return nil
-}
-
-// verifyOutcome classifies a recorded process against the live OS.
-type verifyOutcome int
-
-const (
-	verifyGone      verifyOutcome = iota // provably not running anymore
-	verifyNotOurs                        // a live process exists but is provably NOT this instance's browser
-	verifyConfirmed                      // identity fully verified
-	verifyUnknown                        // exists (or may exist) but cannot be confirmed either way
-)
-
-// verifyRecordedProcess compares one runtime record with the live
-// process at its PID. Confirmation requires EVERY identity signal
-// to check out: creation time, executable path, and the parsed
-// --user-data-dir argument naming exactly this instance's folder.
-// A signal that DISPROVES the identity (a different process now
-// owns the PID) clears the record; a signal that merely cannot
-// be READ leaves the instance at "unknown" — never adopted,
-// never acted on.
-func (s *InstanceService) verifyRecordedProcess(rt model.InstanceRuntime) (verifyOutcome, runner.Process) {
-	if rt.Platform != "" && rt.Platform != runtime.GOOS {
-		return verifyUnknown, nil // recorded on another OS: unverifiable here
-	}
-	info, err := s.launcher.Inspect(rt.PID)
-	if err != nil {
-		if errors.Is(err, runner.ErrProcessGone) {
-			return verifyGone, nil
-		}
-		// Access denied (or any other inspection failure): the
-		// process may well be alive — nothing may be concluded.
-		return verifyUnknown, nil
-	}
-	// unprovable collects the signals that could not be checked;
-	// any one of them caps the outcome at "unknown".
-	unprovable := false
-	if rt.ProcessCreatedAt <= 0 {
-		// The record was written when tracking failed at launch:
-		// no creation time was ever captured, so PID reuse can
-		// never be ruled out and the process can never be fully
-		// confirmed — at best it stays unknown while it lives.
-		unprovable = true
-	} else if info.CreatedAt != rt.ProcessCreatedAt {
-		return verifyNotOurs, nil // PID recycled by another process
-	}
-	// The executable path is a mandatory identity signal, not an
-	// optional one: a record that lacks it, or a process whose
-	// path cannot be read, can never be adopted — an empty path
-	// is never treated as a wildcard or skipped over.
-	if rt.ExecutablePath == "" || info.ExecutablePath == "" {
-		return verifyUnknown, nil
-	}
-	if !strings.EqualFold(filepath.Clean(info.ExecutablePath), filepath.Clean(rt.ExecutablePath)) {
-		return verifyNotOurs, nil // a different browser binary owns this PID
-	}
-	if !info.HasCommandLine {
-		// The instance-folder ownership — the fact that decides
-		// whether closing this process is safe — is unproven.
-		return verifyUnknown, nil
-	}
-	absDir := filepath.Join(s.layout.Data, filepath.FromSlash(rt.UserDataDir))
-	// The launch used the RESOLVED folder path; accept the
-	// argument naming either the lexical or the resolved form of
-	// the instance folder — each compared exactly.
-	dirs := []string{absDir}
-	if resolved, rerr := resolveFinalPath(absDir); rerr == nil && resolved != absDir {
-		dirs = append(dirs, resolved)
-	}
-	uses := false
-	for _, d := range dirs {
-		if commandLineUsesDir(info.CommandLine, d) {
-			uses = true
-			break
-		}
-	}
-	if !uses {
-		return verifyNotOurs, nil
-	}
-	if unprovable {
-		return verifyUnknown, nil
-	}
-	proc, err := s.launcher.Open(rt.PID, rt.ProcessCreatedAt)
-	if err != nil {
-		return verifyUnknown, nil
-	}
-	return verifyConfirmed, proc
-}
-
-// commandLineUsesDir reports whether the command line's
-// --user-data-dir argument names exactly absDir. The argument is
-// extracted by parsing (runner.UserDataDirArg) and the paths are
-// compared whole, after cleaning, case-insensitively per Windows
-// path semantics — a folder that merely shares a prefix (P-10
-// vs P-1) or a path appearing in any other argument never
-// matches.
-func commandLineUsesDir(commandLine, absDir string) bool {
-	value, ok := runner.UserDataDirArg(commandLine)
-	if !ok {
-		return false
-	}
-	return strings.EqualFold(filepath.Clean(value), filepath.Clean(absDir))
-}
-
-func (s *InstanceService) reconcileOne(c context.Context, rt model.InstanceRuntime) {
-	inst, err := s.store.GetInstance(c, rt.InstanceID)
-	if err != nil {
-		// The instance is gone (its record should have cascaded);
-		// drop the orphan record.
-		_ = s.store.DeleteInstanceRuntime(c, rt.InstanceID)
-		return
-	}
-	outcome, proc := s.verifyRecordedProcess(rt)
-	switch outcome {
-	case verifyConfirmed:
-		w := &procWatch{proc: proc, done: make(chan struct{}), persisted: true}
-		s.rtMu.Lock()
-		s.procs[inst.ID] = w
-		s.rtMu.Unlock()
-		_ = s.store.SetInstanceStatus(c, inst.ID, model.StatusRunning)
-		go s.watchProcess(inst.ID, w)
-		s.noteReconcile(inst.ID, "启动时重新识别运行中的实例", logging.StatusSuccess, "")
-		s.log.Info("re-attached to running browser instance", "id", inst.ID, "pid", rt.PID)
-	case verifyGone, verifyNotOurs:
-		_ = s.store.DeleteInstanceRuntime(c, rt.InstanceID)
-		_ = s.store.SetInstanceStatus(c, inst.ID, model.StatusStopped)
-		action := "启动时确认实例已关闭"
-		if outcome == verifyNotOurs {
-			action = "启动时确认原记录进程已不属于该实例"
-		}
-		s.noteReconcile(inst.ID, action, logging.StatusSuccess, "")
-		s.log.Info("instance runtime record cleared at startup", "id", inst.ID, "outcome", int(outcome))
-	case verifyUnknown:
-		// Safe hold: the runtime record and the persisted
-		// "running" status are KEPT (the process may still be
-		// this instance's browser), and the instance's effective
-		// status becomes "unknown" for this run — every risky
-		// operation refuses on it, and the next startup
-		// reconciles the record again.
-		s.rtMu.Lock()
-		s.unverified[inst.ID] = true
-		s.rtMu.Unlock()
-		s.noteReconcile(inst.ID, "启动时无法确认实例运行状态", logging.StatusFailed, "进程身份无法确认，已进入安全保持状态")
-		s.log.Warn("instance process identity unconfirmed at startup", "id", inst.ID, "pid", rt.PID)
-	}
-}
-
-// effectiveStatus overlays the in-memory runtime truth (tracked
-// processes, in-flight transitions, unverified startup records)
-// onto the persisted status.
-func (s *InstanceService) effectiveStatus(inst model.Instance) model.InstanceStatus {
-	s.rtMu.Lock()
-	defer s.rtMu.Unlock()
-	if t, ok := s.transient[inst.ID]; ok {
-		return t
-	}
-	if _, ok := s.procs[inst.ID]; ok {
-		return model.StatusRunning
-	}
-	if s.unverified[inst.ID] {
-		return model.StatusUnknown
-	}
-	return inst.Status
-}
-
-// applyEffectiveStatuses rewrites the Status of each listed
-// instance to its effective status.
-func (s *InstanceService) applyEffectiveStatuses(list []model.Instance) {
-	for i := range list {
-		list[i].Status = s.effectiveStatus(list[i])
-	}
-}
-
-// watchProcess observes one adopted browser process and is the
-// SINGLE owner of its exit cleanup. However the process ends —
-// the user closes the window, the browser crashes, a stop
-// operation's close request takes effect, or a re-attached
-// browser exits after a DeBrowser restart — the watcher
-// performs the final cleanup exactly once: it unregisters the
-// process and, when a runtime record exists for it (the watch
-// is persisted), holds a "stopping" transition for the whole
-// cleanup (so the instance cannot be restarted into the path
-// of this cleanup's by-ID record and status writes), deletes
-// the record, clears any stale unknown hold, settles the
-// persisted status from the exit code (stopped for a clean
-// exit, error for an abnormal one) and records the fact. done
-// is then closed, releasing any operation waiting for the
-// unified outcome. A watch that is not yet persisted — a start
-// still verifying its process — is only observed: the start
-// operation owns the outcome until it marks the watch
-// persisted.
-func (s *InstanceService) watchProcess(instanceID string, w *procWatch) {
-	<-w.proc.Exited()
-	s.rtMu.Lock()
-	if s.procs[instanceID] == w {
-		delete(s.procs, instanceID)
-	}
-	w.exited = true
-	persisted := w.persisted
-	stopAsked := w.stopAsked
-	if persisted {
-		// The exit cleanup below rewrites this instance's
-		// record and status by ID: until it has run, the
-		// instance must not be startable again — a new start
-		// would persist a fresh record and running status that
-		// this cleanup would then delete and overwrite. Hold
-		// the "stopping" transition for the whole cleanup; it
-		// is released just before done closes. (A watch that
-		// never persisted belongs to a start still in flight:
-		// its "starting" transition already guards the window
-		// and is not touched here.)
-		s.transient[instanceID] = model.StatusStopping
-	}
-	s.rtMu.Unlock()
-	if persisted {
-		if watchSettleHook != nil {
-			watchSettleHook(instanceID)
-		}
-		c, cancel := ctx()
-		defer cancel()
-		_ = s.store.DeleteInstanceRuntime(c, instanceID)
-		code := w.proc.ExitCode()
-		status := model.StatusStopped
-		action := "浏览器进程已退出"
-		recStatus := logging.StatusSuccess
-		if code != 0 && !stopAsked {
-			status = model.StatusError
-			action = "浏览器进程异常退出"
-			recStatus = logging.StatusFailed
-		}
-		_ = s.store.SetInstanceStatus(c, instanceID, status)
-		s.clearUnverifiedMark(instanceID)
-		if s.Auditor != nil {
-			s.Auditor.RecordRuntime("浏览器实例", action, recStatus, map[string]string{
-				"instance_id": instanceID,
-				"pid":         strconv.Itoa(w.proc.PID()),
-				"exit_code":   strconv.Itoa(code),
-			})
-		}
-		s.log.Info("browser process exited", "instance", instanceID, "pid", w.proc.PID(), "exitCode", code)
-		s.rtMu.Lock()
-		delete(s.transient, instanceID)
-		s.rtMu.Unlock()
-	}
-	close(w.done)
-}
-
-// detachWatch removes a watch from the tracked map while its
-// watcher goroutine keeps running on the watch itself. It is
-// used when a start ends in the unknown hold: the instance must
-// read "unknown", not "running", yet the watcher still owns the
-// process's eventual exit cleanup (and settles it, once the
-// hold's runtime record makes the watch persisted).
-func (s *InstanceService) detachWatch(id string, w *procWatch, persisted bool) {
-	s.rtMu.Lock()
-	if s.procs[id] == w {
-		delete(s.procs, id)
-	}
-	if persisted {
-		w.persisted = true
-	}
-	s.rtMu.Unlock()
-}
-
-// holdUnconfirmedInstance puts an instance whose browser may
-// still be running — without DeBrowser being able to confirm
-// its exit or keep watching it — into the "unknown" hold, and
-// reports whether the hold was DURABLY established. The
-// in-memory unverified mark is set first, so this session
-// freezes every risky operation no matter what happens with
-// persistence. Durability comes from the runtime record
-// itself (with the persisted status set to running, exactly
-// like a verified launch): the next startup reconciliation
-// re-judges the recorded process instead of assuming it
-// stopped. createdAt is the process creation time when it was
-// captured (a launch whose post-launch verification failed:
-// the identity is complete and reconciliation may fully
-// verify and re-adopt the process) or 0 when tracking itself
-// failed at launch (no creation time was ever captured, so
-// the process can never be fully confirmed and is never
-// adopted). A non-nil return means the record could not be
-// written, so NO durable protection exists — only this
-// session's memory mark — and the caller must treat the
-// situation as a severe error, never as an ordinary start
-// failure. (A second fallback table was tried in review and
-// removed as over-engineering: real database write failures —
-// disk full, I/O error, locked or damaged file — are
-// database-wide and would defeat a same-database fallback
-// identically, while the dual-record reconciliation it
-// required produced real state bugs.)
-func (s *InstanceService) holdUnconfirmedInstance(c context.Context, inst model.Instance, exe string, pid int, createdAt int64) error {
-	s.rtMu.Lock()
-	s.unverified[inst.ID] = true
-	s.rtMu.Unlock()
-	if pid <= 0 {
-		return fmt.Errorf("没有可保护的进程标识")
-	}
-	rt := model.InstanceRuntime{
-		InstanceID:       inst.ID,
-		PID:              pid,
-		ProcessCreatedAt: createdAt,
-		Platform:         runtime.GOOS,
-		ExecutablePath:   exe,
-		UserDataDir:      inst.UserDataDir,
-		StartedAt:        time.Now().Format(time.RFC3339),
-	}
-	if err := s.store.UpsertInstanceRuntime(c, rt); err != nil {
-		return fmt.Errorf("运行记录写入失败：%w", err)
-	}
-	if err := s.store.SetInstanceStatus(c, inst.ID, model.StatusRunning); err != nil {
-		// The record exists, and startup reconciliation derives
-		// the hold from the record itself; the persisted status
-		// is corrected there. Not a durability failure.
-		s.log.Error("hold unconfirmed instance as running failed", "id", inst.ID, "err", err)
-	}
-	s.log.Warn("instance browser exit unconfirmed; held as unknown", "id", inst.ID, "pid", pid)
-	return nil
-}
-
-// clearUnverifiedMark lifts the in-memory unknown hold (used
-// when an exit that looked unconfirmable is confirmed after
-// all, making the hold moot).
-func (s *InstanceService) clearUnverifiedMark(id string) {
-	s.rtMu.Lock()
-	delete(s.unverified, id)
-	s.rtMu.Unlock()
-}
-
 // StartInstance launches the instance's browser (recorded).
 func (s *InstanceService) StartInstance(operationID string, id string) error {
 	op := beginOp(s.Auditor, operationID, "浏览器实例", "instance.start", "instance", id)
@@ -527,6 +71,11 @@ func (s *InstanceService) StartInstance(operationID string, id string) error {
 func (s *InstanceService) startInstance(id string, op *logging.Operation) error {
 	c, cancel := ctx()
 	defer cancel()
+	// Serialize with bookmark file access and profile deletion: the
+	// profile must not be read/written externally between the state
+	// check below and the moment the browser owns it.
+	unlock := s.lockInstanceFiles(id)
+	defer unlock()
 	inst, err := s.store.GetInstance(c, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -603,6 +152,13 @@ func (s *InstanceService) startInstance(id string, op *logging.Operation) error 
 	} else {
 		return fail(fmt.Errorf("实例文件无法访问：%w", lerr))
 	}
+	// An untracked browser may still own the profile (it
+	// restarted itself after an update). Never start a second
+	// browser on the same profile.
+	if profileLocked(launchDir) {
+		return fail(fmt.Errorf("实例文件正被浏览器占用（可能是浏览器自行重启），请先关闭该浏览器"))
+	}
+
 	// No other tracked instance may be using this folder (the
 	// unique binding already guarantees this; this is the live
 	// double-check).
@@ -891,98 +447,4 @@ func (s *InstanceService) stopInstance(id string, op *logging.Operation) error {
 	// running — never a premature "stopped".
 	op.Step("关闭浏览器", logging.StatusFailed, nil)
 	return fmt.Errorf("关闭未完成：浏览器未能正常退出，实例仍在运行")
-}
-
-// allocateCDPPort reserves an ephemeral TCP port on the
-// loopback interface and releases it for the browser to bind.
-// The small race between release and the browser's bind is
-// inherent to port hand-off; a lost race makes the browser run
-// without a debugging endpoint, which synchronization detects
-// and reports — it never breaks the launch.
-func allocateCDPPort() int {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0
-	}
-	defer ln.Close()
-	if addr, ok := ln.Addr().(*net.TCPAddr); ok {
-		return addr.Port
-	}
-	return 0
-}
-
-// SyncRuntimeInfo is the verified runtime identity of one
-// instance for the synchronization module (Stage 10). It is the
-// ONLY channel through which sync learns about processes: sync
-// never scans for processes or ports itself.
-type SyncRuntimeInfo struct {
-	InstanceID string
-	Running    bool
-	// Verified is true when a tracked process exists and its
-	// recorded identity is complete.
-	Verified        bool
-	PID             int
-	ProcessCreateAt int64
-	ExecutablePath  string
-	UserDataDir     string // absolute profile directory
-	CDPPort         int    // 0 = no DeBrowser-assigned CDP port
-}
-
-// SyncRuntimeInfo returns the instance's current runtime
-// identity, re-verifying the tracked process against the
-// persisted runtime record. ok=false means the instance does
-// not exist. A process whose identity cannot be fully verified
-// reports Verified=false and must not join synchronization.
-func (s *InstanceService) SyncRuntimeInfo(id string) (SyncRuntimeInfo, bool) {
-	c, cancel := ctx()
-	defer cancel()
-	inst, err := s.store.GetInstance(c, id)
-	if err != nil {
-		return SyncRuntimeInfo{}, false
-	}
-	info := SyncRuntimeInfo{InstanceID: id}
-	if s.effectiveStatus(inst) != model.StatusRunning {
-		return info, true
-	}
-	s.rtMu.Lock()
-	w := s.procs[id]
-	s.rtMu.Unlock()
-	if w == nil || w.proc == nil {
-		// Running per the record but not tracked by this
-		// process (e.g. re-adopted bookkeeping without a live
-		// watch): identity is not verifiable here.
-		return info, true
-	}
-	rt, err := s.store.GetInstanceRuntime(c, id)
-	if err != nil || rt.ProcessCreatedAt == 0 {
-		return info, true
-	}
-	if w.proc.PID() != rt.PID || w.proc.CreatedAt() != rt.ProcessCreatedAt {
-		return info, true
-	}
-	info.Running = true
-	info.Verified = true
-	info.PID = rt.PID
-	info.ProcessCreateAt = rt.ProcessCreatedAt
-	info.ExecutablePath = rt.ExecutablePath
-	info.UserDataDir = filepath.Join(s.layout.Data, filepath.FromSlash(inst.UserDataDir))
-	info.CDPPort = w.cdpPort
-	return info, true
-}
-
-// VerifySyncIdentity re-checks that the process identified by a
-// previously obtained SyncRuntimeInfo is still the tracked
-// process of the instance (PID + creation time + executable
-// path). Used before window operations and on session resume.
-func (s *InstanceService) VerifySyncIdentity(info SyncRuntimeInfo) bool {
-	if !info.Verified || info.PID <= 0 {
-		return false
-	}
-	s.rtMu.Lock()
-	w := s.procs[info.InstanceID]
-	s.rtMu.Unlock()
-	if w == nil || w.proc == nil {
-		return false
-	}
-	return w.proc.PID() == info.PID && w.proc.CreatedAt() == info.ProcessCreateAt
 }

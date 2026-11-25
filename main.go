@@ -47,6 +47,10 @@ func init() {
 
 func main() {
 	if err := run(); err != nil {
+		// The release build has no console (-H windowsgui), so a bare
+		// stderr write would be invisible to the user. Surface the
+		// failure in a native message box as well.
+		showStartupError(err)
 		fmt.Fprintf(os.Stderr, "debrowser: %v\n", err)
 		os.Exit(1)
 	}
@@ -78,7 +82,7 @@ func run() error {
 	}
 
 	// The startup record deliberately carries no filesystem paths:
-	// log files leave the machine in diagnostic exports, and
+	// log files leave the machine in log exports, and
 	// absolute paths disclose the user's directory layout.
 	logger.Info("starting debrowser")
 
@@ -87,7 +91,6 @@ func run() error {
 	// running instance to focus its window and exits successfully.
 	lock, err := singleinstance.Acquire(cfg.Layout.InstanceLock)
 	if err != nil {
-		_ = failStart("获取单实例锁失败", err)
 		var already *singleinstance.AlreadyRunningError
 		if errors.As(err, &already) {
 			if serr := singleinstance.SignalActivation(cfg.Layout.ActivationFile); serr != nil {
@@ -98,6 +101,7 @@ func run() error {
 			fmt.Fprintf(os.Stderr, "DeBrowser 已在运行（进程 %d），已尝试唤起现有窗口。\n", already.PID)
 			return nil
 		}
+		_ = failStart("获取单实例锁失败", err)
 		logger.Error("single-instance lock failed", "error", err)
 		return err
 	}
@@ -187,7 +191,7 @@ func run() error {
 	// be wired); flush those outcomes into the unified record now.
 	instanceService.ReportReconciliation()
 
-	diagnosticsService := service.NewDiagnosticsService(db, logSystem, appService)
+	dataService := service.NewDataService(db, logSystem, appService)
 	syncService := service.NewSyncService(instanceService)
 	syncService.Auditor = logSystem
 
@@ -199,7 +203,7 @@ func run() error {
 	proxyService.Auditor = logSystem
 	instanceService.ProxyPortFor = proxyService.ProxyPortForInstance
 
-	wailsApp := app.New(cfg, appService, instanceService, diagnosticsService, browserService, bookmarkService, syncService, proxyService, logger, assets)
+	wailsApp := app.New(cfg, appService, instanceService, dataService, browserService, bookmarkService, syncService, proxyService, logger, assets)
 	logSystem.RecordLifecycle("应用初始化完成", logging.StatusSuccess, nil)
 	runErr := wailsApp.Run()
 	if runErr != nil {

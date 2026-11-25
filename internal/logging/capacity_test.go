@@ -245,7 +245,7 @@ func TestCapacityUnreachableReportsError(t *testing.T) {
 		t.Fatal("expected an explicit cleanup-failure error")
 	}
 	if _, n := sys.CapacityError(); n == 0 {
-		t.Fatal("capacity failure was not recorded for diagnostics")
+		t.Fatal("capacity failure was not recorded for the data page")
 	}
 	// The huge newest record must still be there.
 	found := false

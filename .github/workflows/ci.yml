@@ -6,7 +6,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev, develop]
   pull_request:
 
 permissions:
@@ -19,15 +19,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.26.10"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -95,18 +95,16 @@ jobs:
       - name: Go tests
         run: go test ./...
 
-      - name: Generate placeholder application icon
-        # build/appicon.png is a binary brand asset that is not committed
-        # yet; use the Wails example icon so icon/.syso generation in the
-        # build below runs end to end. See docs/DEVELOPMENT.md.
-        working-directory: build
-        run: wails3 generate icons -example
+      - name: Generate application icon
+        # build/appicon.png is the committed 1024x1024 brand asset; the
+        # Windows .ico is generated from it (macOS output disabled).
+        run: wails3 generate icons -input build/appicon.png -macfilename "" -windowsfilename build/windows/icon.ico
 
       - name: Build Windows x64 application (Wails v3)
         run: wails3 build
 
       - name: Upload application artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: DeBrowser-windows-amd64
           path: bin/*.exe

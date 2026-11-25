@@ -561,6 +561,47 @@ func TestRefreshSourceReplacesNodes(t *testing.T) {
 	}
 }
 
+// TestRefreshSourcePreservesBindingsForSurvivingNodes pins the
+// refresh contract: a node that still exists after the subscription
+// refresh keeps its ID, so the instance bound to it stays bound (and
+// keeps its listener port). Only nodes that vanished lose bindings.
+func TestRefreshSourcePreservesBindingsForSurvivingNodes(t *testing.T) {
+	f := testProxyFixture(t)
+	view := f.addSubscriptionOK(t)
+	inst := f.makeInstance(t, "丙")
+	nodeA := f.nodeByName(t, "NodeA")
+	binding, err := f.svc.SetBinding("op", inst.ID, nodeA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// NodeA survives (changed server port), NodeB survives, NodeC is new.
+	f.stubFetch("proxies:\n"+
+		"  - {name: NodeA, type: socks5, server: 127.0.0.1, port: 18111}\n"+
+		"  - {name: NodeB, type: socks5, server: 127.0.0.1, port: 18102}\n"+
+		"  - {name: NodeC, type: socks5, server: 127.0.0.1, port: 18103}\n", nil)
+	if _, err := f.svc.RefreshSource("op", view.ID); err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := f.svc.ListNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 3 {
+		t.Fatalf("nodes after refresh = %d, want 3", len(nodes))
+	}
+	after := f.nodeByName(t, "NodeA")
+	if after.ID != nodeA.ID {
+		t.Fatalf("NodeA id changed: %s -> %s", nodeA.ID, after.ID)
+	}
+	bindings, err := f.svc.ListBindings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bindings) != 1 || bindings[0].NodeID != nodeA.ID || bindings[0].ListenPort != binding.ListenPort {
+		t.Fatalf("binding after refresh = %+v, want node %s on port %d", bindings, nodeA.ID, binding.ListenPort)
+	}
+}
+
 // TestLegacyDataUntouched pins the redesign's data promise:
 // migration 0015 only ADDS tables — the legacy proxy tables and
 // the instances' legacy proxy_id column survive a migration
@@ -578,5 +619,46 @@ func TestLegacyDataUntouched(t *testing.T) {
 	}
 	if legacyTables != 3 {
 		t.Fatalf("legacy tables present = %d, want all 3 preserved", legacyTables)
+	}
+}
+
+// Node definitions carry passwords, UUIDs and private keys. They must
+// not sit in SQLite as plain text, while the generated core config
+// (which the core must read) still receives the real values.
+func TestNodeDefinitionsEncryptedAtRest(t *testing.T) {
+	f := testProxyFixture(t)
+	yaml := "proxies:\n" +
+		"  - {name: Sec, type: socks5, server: 127.0.0.1, port: 18101, username: user1, password: pass123}\n"
+	f.stubFetch(yaml, nil)
+	if _, err := f.svc.AddSubscriptionSource("op", "加密测试", testSubURL); err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := f.store.ListProxyNodes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("nodes = %d, want 1", len(nodes))
+	}
+	raw := nodes[0].ConfigJSON
+	if strings.Contains(raw, "pass123") {
+		t.Fatalf("node definition stored in plain text: %s", raw)
+	}
+	if !strings.HasPrefix(raw, nodeConfigSecretPrefix) {
+		t.Fatalf("node definition not encrypted: %s", raw)
+	}
+
+	f.svc.mu.Lock()
+	err = f.svc.regenerateLocked(context.Background())
+	f.svc.mu.Unlock()
+	if err != nil {
+		t.Fatalf("regenerate: %v", err)
+	}
+	content, err := os.ReadFile(f.svc.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "pass123") {
+		t.Fatal("generated core config lost the node password")
 	}
 }

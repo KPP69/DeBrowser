@@ -4,7 +4,7 @@
 import * as AppService from "./appservice.js";
 import * as BookmarkService from "./bookmarkservice.js";
 import * as BrowserService from "./browserservice.js";
-import * as DiagnosticsService from "./diagnosticsservice.js";
+import * as DataService from "./dataservice.js";
 import * as InstanceService from "./instanceservice.js";
 import * as ProxyService from "./proxyservice.js";
 import * as SyncService from "./syncservice.js";
@@ -12,7 +12,7 @@ export {
     AppService,
     BookmarkService,
     BrowserService,
-    DiagnosticsService,
+    DataService,
     InstanceService,
     ProxyService,
     SyncService
@@ -30,7 +30,7 @@ export type {
     CoreStatusView,
     CreateInstanceInput,
     CreateLibraryNodeInput,
-    DiagnosticsView,
+    DataView,
     ExportResult,
     ExportSummary,
     LogCapacityView,

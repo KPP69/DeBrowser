@@ -1,5 +1,5 @@
 import {
-  DiagnosticsService,
+  DataService,
   type ClientEventInput,
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 
@@ -18,7 +18,7 @@ export function newOperationId(): string {
 }
 
 function send(input: ClientEventInput): void {
-  DiagnosticsService.RecordClientEvent(input).catch(() => {
+  DataService.RecordClientEvent(input).catch(() => {
     // 记录失败不打扰用户，也不影响业务。
   });
 }

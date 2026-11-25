@@ -11,8 +11,7 @@ import (
 // reshaped it into a pure path registration table. This test
 // covers the FINAL shape; stage12_test.go covers the 0011→0012
 // upgrade itself. DeBrowser never auto-detects browsers; this
-// table is the only browser reference the product persists
-// besides managed kernels.
+// table is the only browser reference the product persists.
 
 func TestMigration11FinalShape(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "fresh.db"))
@@ -54,10 +53,6 @@ func TestMigration11FinalShape(t *testing.T) {
 		t.Fatal("duplicate executable_path must fail")
 	}
 	// Historical data coexists untouched.
-	if _, err := db.SQL().ExecContext(ctx,
-		`INSERT INTO kernels (id, version, install_path, executable_path) VALUES ('k1', '142.0.1.2', 'kernels/142.0.1.2', 'kernels/142.0.1.2/chrome.exe')`); err != nil {
-		t.Fatalf("kernel insert beside external browsers: %v", err)
-	}
 	var integrity string
 	if err := db.SQL().QueryRowContext(ctx, `PRAGMA integrity_check`).Scan(&integrity); err != nil || integrity != "ok" {
 		t.Fatalf("integrity_check = %q, %v", integrity, err)

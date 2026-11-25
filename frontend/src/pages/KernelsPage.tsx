@@ -6,6 +6,7 @@ import {
 } from "../../bindings/github.com/KPP69/DeBrowser/internal/service";
 import { notifyError, notifySuccess, notifyWarning } from "../stores/useNotificationStore";
 import { newOperationId, recordOperationFeedback } from "../lib/operations";
+import { usePageRefresh } from "../hooks/usePageRefresh";
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -50,6 +51,11 @@ export default function KernelsPage() {
       setLoading(false);
     }
   }, []);
+
+  // 已访问页面保持挂载，其他页面刚改过的数据不会自己刷新：
+  // 每次回到本页时静默重载一次（首次挂载由原有加载逻辑负责）。
+  usePageRefresh("kernels", reload);
+
 
   useEffect(() => {
     void reload().then((message) => {

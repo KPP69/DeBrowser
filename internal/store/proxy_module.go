@@ -127,13 +127,53 @@ func (s *Store) ListProxyNodes(ctx context.Context) ([]model.ProxyNode, error) {
 	return out, rows.Err()
 }
 
-// ReplaceProxyNodes swaps a source's whole node set in the
-// caller's transaction (used by subscription refresh): bindings
-// to nodes that no longer exist are removed by CASCADE.
+// DeleteProxyNodesOfSource removes every node of one source (their
+// bindings cascade), used when a source is deleted or replaced whole.
 func (s *Store) DeleteProxyNodesOfSource(ctx context.Context, sourceID string) error {
 	_, err := s.q.ExecContext(ctx, `DELETE FROM proxy_nodes WHERE source_id = ?`, sourceID)
 	if err != nil {
 		return fmt.Errorf("store: delete proxy nodes of source: %w", err)
+	}
+	return nil
+}
+
+// ListProxyNodesOfSource returns one source's nodes ordered by name.
+func (s *Store) ListProxyNodesOfSource(ctx context.Context, sourceID string) ([]model.ProxyNode, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT `+proxyNodeColumns+` FROM proxy_nodes WHERE source_id = ? ORDER BY name`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list proxy nodes of source: %w", err)
+	}
+	defer rows.Close()
+	out := []model.ProxyNode{}
+	for rows.Next() {
+		n, err := scanProxyNode(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: list proxy nodes of source: %w", err)
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// UpdateProxyNodeConfig rewrites one node's stored definition while
+// keeping its ID, so bindings that point at the node stay valid.
+func (s *Store) UpdateProxyNodeConfig(ctx context.Context, id, configJSON string) error {
+	res, err := s.q.ExecContext(ctx,
+		`UPDATE proxy_nodes SET config_json = ? WHERE id = ?`, configJSON, id)
+	if err != nil {
+		return fmt.Errorf("store: update proxy node: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteProxyNode removes one node; bindings to it cascade away.
+func (s *Store) DeleteProxyNode(ctx context.Context, id string) error {
+	if _, err := s.q.ExecContext(ctx, `DELETE FROM proxy_nodes WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("store: delete proxy node: %w", err)
 	}
 	return nil
 }

@@ -15,19 +15,19 @@ import (
 	"github.com/KPP69/DeBrowser/internal/version"
 )
 
-// DiagnosticsService backs the data-management page: a read-only
+// DataService backs the data-management page: a read-only
 // view of the application's version, database state and the
 // unified logging system (categories, real file names, total
 // capacity), plus the per-category record exports implemented in
 // logs_export.go.
 //
-// The former one-click diagnostics export and fault-report
-// export were removed by product decision (2026-11-15): the
-// unified log records — with their own per-category exports —
-// are the single record system, and there is no second audit or
-// diagnostics channel. The sensitivity screening below remains
-// as the fail-closed guard for the record exports.
-type DiagnosticsService struct {
+// The former one-click diagnostic package and fault-report export
+// were removed by product decision (2026-11-15): the unified log
+// records — with their own per-category exports — are the single
+// record system, and there is no second audit or record channel. The
+// sensitivity screening below remains the fail-closed guard for the
+// record exports.
+type DataService struct {
 	db   *database.DB
 	logs *logging.System
 	app  *AppService
@@ -48,9 +48,9 @@ type DiagnosticsService struct {
 	lastExport *ExportSummary
 }
 
-// NewDiagnosticsService builds the service.
-func NewDiagnosticsService(db *database.DB, logs *logging.System, app *AppService) *DiagnosticsService {
-	return &DiagnosticsService{db: db, logs: logs, app: app, replaceFile: platformReplaceFile}
+// NewDataService builds the service.
+func NewDataService(db *database.DB, logs *logging.System, app *AppService) *DataService {
+	return &DataService{db: db, logs: logs, app: app, replaceFile: platformReplaceFile}
 }
 
 // CategoryView is the view of one log category, including the
@@ -73,11 +73,11 @@ type ExportSummary struct {
 	Bytes int64  `json:"bytes"`
 }
 
-// DiagnosticsView is everything the data-management page shows:
+// DataView is everything the data-management page shows:
 // application and database state, the data directory, instance
 // counts and the logging-system categories (run / operation /
 // error) with the unified capacity figures.
-type DiagnosticsView struct {
+type DataView struct {
 	AppName        string         `json:"appName"`
 	AppVersion     string         `json:"appVersion"`
 	SchemaVersion  int            `json:"schemaVersion"`
@@ -98,16 +98,16 @@ type DiagnosticsView struct {
 	LogWriteErrors        int64 `json:"logWriteErrors"`
 }
 
-// GetDiagnostics returns the current diagnostics snapshot.
-func (s *DiagnosticsService) GetDiagnostics() (DiagnosticsView, error) {
+// GetDataView returns the current data snapshot.
+func (s *DataService) GetDataView() (DataView, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	schema, err := s.db.AppliedVersion(ctx)
 	if err != nil {
-		return DiagnosticsView{}, fmt.Errorf("读取数据库结构版本失败：%w", err)
+		return DataView{}, fmt.Errorf("读取数据库结构版本失败：%w", err)
 	}
 	status := s.app.GetStatus()
-	view := DiagnosticsView{
+	view := DataView{
 		AppName:        version.Name,
 		AppVersion:     version.Version,
 		SchemaVersion:  schema,

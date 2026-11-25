@@ -7,12 +7,12 @@ import (
 	"regexp"
 )
 
-// Path redaction for diagnostic exports (Stage 5B review fix).
+// Path redaction for the log exports (Stage 5B review fix).
 //
 // Log files written before the startup record stopped carrying
 // absolute paths — and error messages generated anywhere in the
 // program — can still contain the user's filesystem layout. Since
-// diagnostic ZIPs leave the machine, every log file passes through
+// log ZIPs leave the machine, every log file passes through
 // redactPaths IN MEMORY at export time; the bytes on disk are
 // never modified. The redacted bytes are what get validated,
 // scanned, hashed and archived, so the manifest describes exactly

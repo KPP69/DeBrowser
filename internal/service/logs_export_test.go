@@ -14,7 +14,7 @@ import (
 
 // seedOperationWithError records one full operation chain ending
 // in a failure, through the real logging system of the fixture.
-func seedOperationWithError(t *testing.T, f diagFixture, opID string) {
+func seedOperationWithError(t *testing.T, f dataFixture, opID string) {
 	t.Helper()
 	op := f.logs.BeginOperation(opID, "浏览器实例", "instance.create", "instance", "", "user")
 	op.Step("校验输入", logging.StatusSuccess, nil)

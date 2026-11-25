@@ -5,7 +5,6 @@
  * Settings is the persisted user preference set.
  */
 export interface Settings {
-    "language": string;
     "theme": string;
 
     /**

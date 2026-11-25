@@ -1,12 +1,11 @@
 // Package settings persists the small set of user preferences that
-// live outside the database: UI language and appearance theme. The
-// settings file is <root>/config/settings.json so it travels with the
-// portable application folder.
+// live outside the database: the appearance theme. The settings file
+// is <root>/config/settings.json so it travels with the portable
+// application folder.
 //
-// The UI language is Simplified Chinese only (zh-CN): there is no
-// English language pack and no language switcher by product decision.
-// The language field is still stored explicitly so the Settings page
-// can display it and the file format stays self-describing.
+// The UI is Simplified Chinese only: there is no language field and no
+// language switcher by product decision. A legacy "language" key in an
+// existing settings file is ignored on load.
 package settings
 
 import (
@@ -15,9 +14,6 @@ import (
 	"os"
 	"path/filepath"
 )
-
-// LanguageZhCN is the only supported UI language.
-const LanguageZhCN = "zh-CN"
 
 // Supported appearance themes.
 const (
@@ -28,8 +24,7 @@ const (
 
 // Settings is the persisted user preference set.
 type Settings struct {
-	Language string `json:"language"`
-	Theme    string `json:"theme"`
+	Theme string `json:"theme"`
 	// LogCapacityBytes is the user's total log capacity limit
 	// (unified recording system). Zero means "not configured":
 	// the logging default (100 MB) applies. The field is absent
@@ -40,7 +35,7 @@ type Settings struct {
 
 // Default returns the first-run settings: Simplified Chinese, dark.
 func Default() Settings {
-	return Settings{Language: LanguageZhCN, Theme: ThemeLight}
+	return Settings{Theme: ThemeLight}
 }
 
 // Log capacity bounds mirrored from internal/logging (kept as
@@ -53,9 +48,6 @@ const (
 
 // Validate reports whether the settings hold supported values.
 func (s Settings) Validate() error {
-	if s.Language != LanguageZhCN {
-		return fmt.Errorf("unsupported language %q (only %s is supported)", s.Language, LanguageZhCN)
-	}
 	switch s.Theme {
 	case ThemeDark, ThemeLight, ThemeWarm:
 	default:
@@ -105,6 +97,14 @@ func Save(file string, s Settings) error {
 	}
 	tmpName := tmp.Name()
 	if _, err := tmp.Write(append(data, '\n')); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("write settings %s: %w", file, err)
+	}
+	// Flush to disk before the rename: an interrupted shutdown must
+	// never leave an empty settings.json, which would fail the next
+	// startup at Load.
+	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
 		return fmt.Errorf("write settings %s: %w", file, err)

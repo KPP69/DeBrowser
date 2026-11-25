@@ -18,7 +18,7 @@ DeBrowser 是模块化单体：一个 Go 二进制内嵌一个 React 前端，�
 │ 服务层 (internal/service)                              │
 │  AppService · InstanceService · BrowserService         │
 │  BookmarkService · SyncService · ProxyService          │
-│  DiagnosticsService                                    │
+│  DataService                                    │
 ├────────────────────────────────────────────────────────┤
 │ 基础层 (internal/)                                     │
 │  paths · config · settings · logging · database        │
@@ -70,7 +70,7 @@ Go 1.26 + Wails v3.0.0 后端；React 18 + TypeScript + Vite + Tailwind CSS v4 �
 2. `logging` 打开日志系统（在数据库与服务之前打开，关闭时最后关闭）。
 3. `singleinstance` 取得按安装划分的操作系统级文件锁（`data/app.lock`）。锁由操作系统仲裁并在持有者以任何方式退出时自动释放，不存在陈旧锁；第二次启动只写入激活信号（`data/activate.request`）请已运行实例聚焦窗口，然后在不触碰数据库的情况下退出。
 4. `database` 打开 SQLite 并以事务方式应用待执行迁移（升级前先做经验证的备份，见 [DATABASE.md](DATABASE.md)）。
-5. `service` 依次构建服务：AppService（加载设置并应用日志容量）→ InstanceService（构造时对账运行身份记录，见「浏览器实例和进程管理」）→ BrowserService → BookmarkService → 打开凭据 Vault → DiagnosticsService → SyncService → ProxyService（并把实例启动时的代理端口查询钩子接线到 InstanceService）。
+5. `service` 依次构建服务：AppService（加载设置并应用日志容量）→ InstanceService（构造时对账运行身份记录，见「浏览器实例和进程管理」）→ BrowserService → BookmarkService → 打开凭据 Vault → DataService → SyncService → ProxyService（并把实例启动时的代理端口查询钩子接线到 InstanceService）。
 6. `app` 组装 Wails 应用并运行。后台循环（状态事件每 10 秒、激活信号监视每 500 毫秒）由 `lifecycle` 在应用 context 下治理。
 
 关闭时按固定顺序释放：应用停止并排空后台循环 → 代理服务停掉自有 Mihomo 核心 → 数据库 → 实例锁 → 日志。
@@ -91,7 +91,7 @@ Go 1.26 + Wails v3.0.0 后端；React 18 + TypeScript + Vite + Tailwind CSS v4 �
 | `BookmarkService` | 书签资源库与实例真实书签的分发、聚合搜索、编辑与删除 |
 | `SyncService` | 多开同步会话（主控—跟随）、窗口排列与镜像 |
 | `ProxyService` | Mihomo 核心管理、代理源与节点管理、实例节点绑定与测速 |
-| `DiagnosticsService` | 数据管理页后端：应用版本、数据库状态、统一日志查看与导出（名字沿用自早期的诊断功能；早期的一键诊断导出已移除，统一日志是唯一的记录系统） |
+| `DataService` | 数据管理页后端：应用版本、数据库状态、统一日志查看与导出（名字沿用自早期的诊断功能；早期的一键诊断导出已移除，统一日志是唯一的记录系统） |
 
 ## 浏览器实例和进程管理
 
@@ -175,7 +175,6 @@ Go 1.26 + Wails v3.0.0 后端；React 18 + TypeScript + Vite + Tailwind CSS v4 �
 | `data/secrets.vault` | 凭据 Vault |
 | `config/settings.json` | 用户设置（语言、主题、日志容量） |
 | `webview2-data/` | 应用窗口的 WebView2 用户数据 |
-| `kernels/` | 便携布局保留目录（当前无功能使用，见 [DATABASE.md](DATABASE.md) 的历史兼容说明） |
 
 ## 安全与隐私边界
 
